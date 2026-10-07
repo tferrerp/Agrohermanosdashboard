@@ -12,13 +12,16 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 | Sección | Qué hace |
 |---|---|
 | Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; por cobrar, saldo con la pinera, inventario en Barro Blanco y alertas. |
-| Mayoristas | Pedidos y abonos por cliente (San Fermín, San Nicolás). Los abonos pagan primero los pedidos más viejos para saber qué está vencido. |
-| Barro Blanco | Despachos, ventas reportadas por Rubén, pagos, inventario en el punto y liquidación 50/50. |
+| Mayoristas | Pedidos y abonos por cliente (San Fermín, San Nicolás). Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. |
+| Barro Blanco | Despachos, ventas reportadas por Rubén, pagos, piezas dañadas (las asume la sociedad), inventario en el punto y liquidación 50/50. |
 | Cliente final | Pedidos con nombre, celular, dirección, pagos y saldo. |
-| La Pinera | Estado de cuenta: compras y cargos contra pagos, con saldo corrido. |
-| Gastos | Fletes, cargues y otros gastos que se restan de la utilidad. |
-| Precios y costos | Calculadora de pieza, costo real por rastra, listas de precios (pegadas desde Excel) y configuración de la sociedad. |
+| Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
+| Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
+
+## Cargar con Claude
+
+Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp, una nota o una foto de una remisión. Claude lo convierte en registros y abre cada formulario ya lleno para revisarlo antes de guardar. Usa el `sample` de la página, que gasta del uso de Claude de quien lo abre.
 
 ## Fórmulas
 
