@@ -13,6 +13,7 @@
 const SHEET_ID = '__SHEET_ID__';
 const HTML_URL = 'https://raw.githubusercontent.com/tferrerp/Agrohermanosdashboard/claude/agrohermanos-dashboard-z6gqsc/google/tablero-agrohermanos.html';
 const HTML_NAME = 'tablero-agrohermanos.html';
+const NOMBRE_HOJA = 'Tablero Agrohermanos · datos';
 const ENTRADAS = 'Tablero Agrohermanos · entradas';
 const PROCESADOS = 'Tablero Agrohermanos · entradas procesadas';
 const COPIAS = 'Tablero Agrohermanos · copias';
@@ -45,8 +46,17 @@ function ultimoHtml_() {
   return mejor.getBlob().getDataAsString('UTF-8');
 }
 
+// La hoja de datos: la que tiene este código (Extensiones → Apps Script) o, si no, la que se llama NOMBRE_HOJA.
 function libro_() {
-  return SHEET_ID && SHEET_ID.indexOf('__') !== 0 ? SpreadsheetApp.openById(SHEET_ID) : SpreadsheetApp.getActiveSpreadsheet();
+  if (SHEET_ID && SHEET_ID.indexOf('__') !== 0) return SpreadsheetApp.openById(SHEET_ID);
+  const activo = SpreadsheetApp.getActiveSpreadsheet();
+  if (activo) return activo;
+  const it = DriveApp.getFilesByName(NOMBRE_HOJA);
+  while (it.hasNext()) {
+    const f = it.next();
+    if (!f.isTrashed() && f.getMimeType() === MimeType.GOOGLE_SHEETS) return SpreadsheetApp.openById(f.getId());
+  }
+  throw new Error('No encontré la hoja "' + NOMBRE_HOJA + '" en tu Drive.');
 }
 
 function hoja_(libro, nombre) {
