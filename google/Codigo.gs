@@ -218,10 +218,13 @@ function importarEntradas_(libro) {
   return conCandado_(function () {
     let total = 0;
     const listos = carpeta_(PROCESADOS);
-    while (archivos.hasNext()) {
-      const f = archivos.next();
+    // Del más viejo al más nuevo, para que una corrección posterior quede encima de la anterior.
+    const lista = [];
+    while (archivos.hasNext()) lista.push(archivos.next());
+    lista.sort(function (a, b) { return a.getDateCreated() - b.getDateCreated(); });
+    lista.forEach(function (f) {
       let j;
-      try { j = JSON.parse(f.getBlob().getDataAsString('UTF-8')); } catch (e) { continue; }
+      try { j = JSON.parse(f.getBlob().getDataAsString('UTF-8')); } catch (e) { return; }
       Object.keys(j).filter(colValida_).forEach(function (c) {
         (Array.isArray(j[c]) ? j[c] : []).forEach(function (rec) {
           if (!rec || !rec.id) return;
@@ -241,7 +244,7 @@ function importarEntradas_(libro) {
         h.getRange(2, 1, 1, 4).setNumberFormat('@').setValues([['general', '', 'Configuración del tablero', JSON.stringify(nueva)]]);
       }
       f.moveTo(listos);
-    }
+    });
     return total;
   });
 }

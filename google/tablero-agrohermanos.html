@@ -923,13 +923,14 @@ function model() {
 
   const finalSaldo = sum(entries.filter(e => e.canal === 'final'), e => Math.max(0, e.calc.saldo));
   const mayorSaldo = sum([...cartera.values()], c => Math.max(0, c.saldo));
+  const anticipos = sum([...cartera.values()], c => Math.max(0, -c.saldo));
 
   const allDates = [
     ...d.ventas, ...d.abonos, ...d.bbDespachos, ...d.bbVentas, ...d.bbPagos, ...d.pineraCompras, ...d.pineraPagos, ...d.gastos,
   ].map(x => x.fecha).filter(isDate).sort();
 
   porEntregar.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
+  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, anticipos, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
   MODEL_KEY = key;
   return MODEL;
 }
@@ -1302,7 +1303,7 @@ VIEW_FN.resumen = R => {
     ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas')}
   </div>`;
   const pos = `<div class="kpis soft">
-    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}`, { cls: 'sm' })}
+    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}${M.anticipos > 0.5 ? ` · Anticipos de mayoristas ${cop(M.anticipos, true)}` : ''}`, { cls: 'sm' })}
     ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), M.pineraSaldo >= 0 ? 'Le debes' : 'A tu favor', { cls: 'sm' })}
     ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `${cop(invVal)} a precio de sociedad`, { cls: 'sm' })}
     ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm' })}
@@ -1379,13 +1380,14 @@ VIEW_FN.mayoristas = R => {
   const A = M.d.abonos.filter(a => inR(a.fecha, R) && (!sel || a.clienteId === sel)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const ing = sum(Ef, e => e.ingreso), ut = sum(Ef, e => e.util), ra = sum(Ef, e => e.rastras);
   const vencTot = sum([...M.cartera.values()].filter(c => !sel || c.cliente.id === sel), c => c.vencido);
-  const saldoTot = sum([...M.cartera.values()].filter(c => !sel || c.cliente.id === sel), c => c.saldo);
+  const carSel = [...M.cartera.values()].filter(c => !sel || c.cliente.id === sel);
+  const saldoTot = sum(carSel, c => Math.max(0, c.saldo)), antTot = sum(carSel, c => Math.max(0, -c.saldo));
 
   const kp = `<div class="kpis">
     ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)' })}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
     ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`)}
-    ${kpi('Cartera hoy', cop(saldoTot), vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido')}
+    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${antTot > 0.5 ? ` · ${cop(antTot)} de anticipos a favor de clientes` : ''}`)}
   </div>`;
   const ped = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
