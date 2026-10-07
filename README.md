@@ -11,12 +11,12 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 
 | Sección | Qué hace |
 |---|---|
-| Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; por cobrar, saldo con la pinera, inventario en Barro Blanco y alertas. |
-| Mayoristas | Pedidos y abonos por cliente (San Fermín, San Nicolás). Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. |
-| Barro Blanco | Despachos, ventas reportadas por Rubén, pagos, piezas dañadas (las asume la sociedad), inventario en el punto y liquidación 50/50. |
-| Cliente final | Directorio de clientes finales (personas, constructoras, arquitectos) y sus pedidos con dirección, pagos y saldo. |
+| Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; pedidos por entregar, deudas (te deben / debes), saldo con la pinera, inventario en Barro Blanco y alertas. |
+| Mayoristas | Pedidos y abonos por cliente. Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. Si un mayorista pagó de más, queda con *saldo a favor*. |
+| Barro Blanco | Inventario en el punto, despachos, devoluciones con su motivo (dañada, no se vendió…), ventas reportadas por Rubén (con la diferencia contra la lista), pagos y liquidación 50/50. |
+| Cliente final | Directorio de clientes finales, pedidos por entregar y despachados, y anticipos con foto del comprobante. Un pedido pendiente no cuenta como venta hasta que se despacha. |
 | Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
-| Pauta | Gasto en publicidad de Meta por campaña: presupuesto diario o cobro real del mes. Se suma a los gastos del período. |
+| Pauta | Gasto en publicidad de Meta por campaña, con interruptor de prendida/apagada y presupuesto mensual o diario. Solo suma los días que estuvo prendida (o el cobro real del mes). |
 | Nómina | Lo que se le debe a cada trabajador. Cada despacho suma sus rastras × la tarifa de aserrada o arriada; los pagos (normalmente los sábados) lo bajan. |
 | Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
@@ -31,7 +31,9 @@ La carpeta `google/` tiene la versión que se abre como un link normal de Google
 
 ## Cargar con Claude
 
-Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp, una nota o una foto de una remisión. Claude lo convierte en registros y abre cada formulario ya lleno para revisarlo antes de guardar. Usa el `sample` de la página, que gasta del uso de Claude de quien lo abre.
+Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp, una nota o una foto de una remisión. Claude lo convierte en registros y abre cada formulario ya lleno para revisarlo antes de guardar. Los formularios de pedido (mayoristas, Barro Blanco y cliente final) también tienen **Llenar con foto**, y el de anticipo lee el comprobante. Usa el `sample` de la página, que gasta del uso de Claude de quien lo abre.
+
+Las fotos de comprobantes se guardan con el registro: dentro de Claude como archivos del tablero (`assets`), y en la versión Google en la carpeta “Tablero Agrohermanos · comprobantes” de Drive.
 
 ## Fórmulas
 
@@ -58,4 +60,4 @@ node build.mjs
 
 ### Datos
 
-Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, `nomina`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).
+Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, `nomina`, `anticipos`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).

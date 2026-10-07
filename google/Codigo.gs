@@ -17,7 +17,8 @@ const NOMBRE_HOJA = 'Tablero Agrohermanos · datos';
 const ENTRADAS = 'Tablero Agrohermanos · entradas';
 const PROCESADOS = 'Tablero Agrohermanos · entradas procesadas';
 const COPIAS = 'Tablero Agrohermanos · copias';
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
+const FOTOS = 'Tablero Agrohermanos · comprobantes';
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
 // Pestañas que no son registros.
 const RESERVADAS = ['config'];
 const ENCABEZADO = ['id', 'fecha', 'resumen', 'datos'];
@@ -165,6 +166,14 @@ function guardarArchivo(nombre, texto) {
   return carpeta_(COPIAS).createFile(nombre, texto, tipo).getUrl();
 }
 
+// Foto de un comprobante (llega en base64) a la carpeta de comprobantes de tu Drive.
+function guardarImagen(nombre, base64, tipo) {
+  if (!/^image\/(jpeg|png|webp|gif|heic|heif)$/.test(String(tipo))) throw new Error('Solo se pueden guardar fotos.');
+  const limpio = String(nombre || 'comprobante.jpg').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120);
+  const blob = Utilities.newBlob(Utilities.base64Decode(base64), tipo, limpio);
+  return carpeta_(FOTOS).createFile(blob).getUrl();
+}
+
 /* ---------- Apoyo ---------- */
 
 // Carpeta por nombre; si no existe, la crea junto a la hoja de datos.
@@ -186,7 +195,7 @@ function prepararLibro_(libro) {
     ['La columna "resumen" es para leer; la columna "datos" es la que usa el tablero.'],
     ['Registra y edita desde el tablero, no a mano aquí, para que los cálculos no se dañen.'],
     [''],
-    ['Pestañas: listas (precios), clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, config.'],
+    ['Pestañas: listas (precios), clientes, ventas, abonos, anticipos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, config.'],
   ]);
   h.getRange(1, 1).setFontWeight('bold').setFontSize(14);
   h.setColumnWidth(1, 720);

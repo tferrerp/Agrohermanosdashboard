@@ -180,6 +180,12 @@ p { margin: 0; }
 .menu button { display: flex; width: 100%; align-items: center; gap: 10px; padding: 8px 10px; border: 0; background: transparent; border-radius: 7px; cursor: pointer; text-align: left; font-size: 13px; }
 .menu button:hover { background: var(--sunken); }
 .menu button i { width: 6px; height: 6px; border-radius: 2px; background: var(--line-strong); flex: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.foto-fill { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 14px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--surface-2); font-size: 12.5px; color: var(--fg-2); }
+.foto-fill .btn { flex: none; }
+.foto-fill:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.menu.pop { position: fixed; right: auto; top: 0; left: 0; width: 220px; z-index: 60; }
+.foto-link { display: inline-block; margin: 0 0 6px; color: var(--accent); font-weight: 600; font-size: 12.5px; text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---------- content blocks ---------- */
 .stack { display: flex; flex-direction: column; gap: 18px; }
@@ -216,6 +222,20 @@ p { margin: 0; }
 .pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .pill { border: 1px solid var(--line-strong); background: var(--surface); border-radius: 99px; padding: 4px 11px; font-size: 12.5px; cursor: pointer; }
 .pill[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.switch { display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); border-radius: 99px; padding: 4px 14px 4px 4px; font: 600 13px/1 var(--f-ui); cursor: pointer; }
+.switch i { position: relative; width: 40px; height: 24px; border-radius: 99px; background: var(--line-strong); transition: background .18s; flex: none; }
+.switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .18s; }
+.switch[aria-checked="true"] { border-color: var(--good); color: var(--good); }
+.switch[aria-checked="true"] i { background: var(--good); }
+.switch[aria-checked="true"] i::after { transform: translateX(16px); }
+.switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:disabled { opacity: .6; cursor: progress; }
+.pauta-ctls { display: grid; gap: 12px; margin-bottom: 16px; }
+.pauta-ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 14px 16px; box-shadow: var(--shadow); }
+.pauta-ctl .pc-txt { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pauta-ctl .pc-txt span { color: var(--muted); font-size: 12.5px; }
+.pauta-ctl .pc-st { color: var(--fg-2); font-size: 12.5px; }
+@media (max-width: 720px) { .pauta-ctl { grid-template-columns: minmax(0, 1fr) auto; } .pauta-ctl .pc-st { grid-column: 1 / -1; order: 3; } .pauta-ctl .btn { justify-self: start; } }
 
 /* tables */
 .tbl-wrap { overflow-x: auto; margin-inline: -18px; padding-inline: 18px; }
@@ -314,6 +334,17 @@ p { margin: 0; }
 .ledger b { font-family: var(--f-mono); font-weight: 500; font-variant-numeric: tabular-nums; }
 .ledger .total { border-top: 1px solid var(--line-strong); border-bottom: 0; padding-top: 10px; margin-top: 4px; }
 .ledger .total span, .ledger .total b { color: var(--fg); font-weight: 600; }
+.ledger span small { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+.ledger .lk { cursor: pointer; border-radius: 6px; }
+.ledger .lk:hover span { color: var(--fg); }
+.ledger .lk:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ldg-h { margin: 4px 0 2px; font: 500 10px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.ldg-h + .ledger { margin-bottom: 14px; }
+.inv-res { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.inv-res div { background: var(--surface-2); padding: 10px 12px; display: flex; flex-direction: column; gap: 4px; }
+.inv-res span { font: 500 10px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.inv-res b { font: 600 16px/1.2 var(--f-mono); font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { .inv-res { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---------- drawer & forms ---------- */
 .drawer { position: fixed; inset: 0; z-index: 50; display: grid; grid-template-columns: minmax(0, 1fr) min(600px, 100%); }
@@ -515,6 +546,7 @@ const IC = {
   edit: '<path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/>',
   pauta: '<path d="M2.5 6.5v3h2l4.5 3v-9l-4.5 3zM11.3 6.2a2.4 2.4 0 0 1 0 3.6M12.9 4.6a4.6 4.6 0 0 1 0 6.8"/>',
   nomina: '<circle cx="6" cy="5.5" r="2"/><path d="M2.5 12.5c.4-2 1.8-3.2 3.5-3.2s3.1 1.2 3.5 3.2M10.5 3.8a2 2 0 0 1 0 3.6M11.6 9.5c1.1.5 1.8 1.5 2 3"/>',
+  dots: '<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>',
   spark: '<path d="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.1 2.1M9.7 9.7l2.1 2.1M11.8 4.2 9.7 6.3M6.3 9.7l-2.1 2.1"/>',
 };
 const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k] || ''}</svg>`;
@@ -522,7 +554,7 @@ const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="non
 /* =========================================================================
    Modelo de datos
    ========================================================================= */
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
 // Tabla de EJEMPLO (precio de la pinera por rastra según el largo). Los costos reales no van en el código:
 // se guardan en la configuración del tablero (Precios y costos → Editar costos).
 const PINERA_EJEMPLO = [
@@ -538,6 +570,7 @@ const MEDIOS = ['Transferencia', 'Efectivo', 'Consignación', 'Otro'];
 const GASTO_CATS = ['Flete', 'Cargue', 'Combustible', 'Aserrío', 'Arriería', 'Inmunización', 'Herramientas', 'Comisiones', 'Otro'];
 const GASTO_CANAL = ['General', 'Mayoristas', 'Barro Blanco', 'Cliente final', 'Producción'];
 const PINERA_CONCEPTOS = ['Madera', 'Aserrío', 'Flete', 'Otro cargo'];
+const MOTIVOS_DEV = ['Pieza dañada', 'No se vendió', 'Cambio de medida', 'Otro'];
 const ESTADOS_FINAL = ['Pendiente', 'Despachado', 'Entregado'];
 const TIPOS_FINAL = ['Persona', 'Constructora', 'Arquitecto o constructor', 'Ferretería o depósito', 'Otro'];
 const CANAL = {
@@ -588,7 +621,7 @@ const CFG = () => (S.demo ? { ...DEFAULT_CONFIG, listaBBVenta: 'demo-l4', pauta:
 const demoNomina = () => ({ desde: addDays(todayStr(), -56), trabajadores: [{ id: 'demo-t1', nombre: 'Aserrador (ejemplo)', concepto: 'aserrada' }, { id: 'demo-t2', nombre: 'Arriero (ejemplo)', concepto: 'arriada' }] });
 function demoPauta() {
   const hoy = todayStr(), antes = addDays(hoy.slice(0, 7) + '-01', -1).slice(0, 7);
-  return { campanas: [{ id: 'demo-p1', nombre: 'Campaña Meta (ejemplo)', plataforma: 'Meta (Facebook e Instagram)', presupuestoDiario: 30000, inicio: addDays(hoy, -120), fin: '', reales: { [antes]: 870000 } }] };
+  return { campanas: [{ id: 'demo-p1', nombre: 'Campaña Meta (ejemplo)', plataforma: 'Meta (Facebook e Instagram)', presupuestoDiario: 30000, presupuestoMensual: 900000, periodos: [{ desde: addDays(hoy, -120), hasta: addDays(hoy, -40) }, { desde: addDays(hoy, -20), hasta: '' }], reales: { [antes]: 870000 } }] };
 }
 
 /* =========================================================================
@@ -614,6 +647,7 @@ function resumenDe(col, r) {
       case 'gastos': return `${r.categoria || 'Gasto'} · ${r.descripcion || ''} · ${cop(r.valor)}`;
       case 'listas': return `${r.nombre} · ${Object.keys(r.precios || {}).length} medidas`;
       case 'clientes': return `${r.nombre} · ${r.tipo === 'final' ? 'cliente final' : 'mayorista'}`;
+      case 'anticipos': return `Anticipo · ${S.data.clientes.find(x => x.id === r.clienteId)?.nombre || ''} · ${cop(r.valor)}${r.medio ? ' · ' + r.medio : ''}`;
       case 'nomina': return `${r.tipo === 'cargo' ? 'Trabajo extra' : 'Pago'} · ${(S.config.nomina?.trabajadores || []).find(t => t.id === r.trabajadorId)?.nombre || ''} · ${cop(r.valor)}`;
       default: return `${cop(r.valor)}${r.medio ? ' · ' + r.medio : ''}`;
     }
@@ -832,7 +866,12 @@ function model() {
   for (const v of d.ventas) {
     const c = calcVenta(v);
     if (v.canal === 'mayorista' && v.estado === 'Por entregar') {
-      porEntregar.push({ id: v.id, fecha: v.fecha, cliente: cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre', ref: v, calc: c, lines: c.lines });
+      porEntregar.push({ id: v.id, fecha: v.fecha, canal: 'mayorista', cliente: cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre', ref: v, calc: c, lines: c.lines });
+      continue;
+    }
+    // Pedido de cliente final que todavía no sale: no es venta ni deuda hasta que se despache.
+    if (v.canal === 'final' && (v.estado || 'Pendiente') === 'Pendiente') {
+      porEntregar.push({ id: v.id, fecha: v.fecha, canal: 'final', cliente: cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final', ref: v, calc: c, lines: c.lines });
       continue;
     }
     const cliente = v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre') : (cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final');
@@ -904,7 +943,7 @@ function model() {
   const desdeN = isDate(nom.desde) ? nom.desde : '9999-12-31';
   const despachos = [];
   for (const v of d.ventas) {
-    if ((v.canal === 'mayorista' && v.estado === 'Por entregar') || (v.canal === 'final' && v.estado === 'Pendiente') || !isDate(v.fecha) || v.fecha < desdeN) continue;
+    if ((v.canal === 'mayorista' && v.estado === 'Por entregar') || (v.canal === 'final' && (v.estado || 'Pendiente') === 'Pendiente') || !isDate(v.fecha) || v.fecha < desdeN) continue;
     const c = calcVenta(v);
     if (c.rastras > 0) despachos.push({ fecha: v.fecha, col: 'ventas', ref: v, remision: v.remision || '', destino: v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista') : (cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final'), rastras: c.rastras });
   }
@@ -921,16 +960,36 @@ function model() {
   const nominaSaldo = new Map(trab.map(t => [t.id, 0]));
   for (const m of nominaMovs) { const s1 = (nominaSaldo.get(m.trabajadorId) || 0) + (m.tipo === 'pago' ? -m.valor : m.valor); nominaSaldo.set(m.trabajadorId, s1); m.saldo = s1; }
 
+  // Anticipos de clientes finales: pagan el pedido al que se cargaron; los que no tienen pedido pagan los más viejos del cliente.
+  const pedFinal = [...entries.filter(e => e.canal === 'final'), ...porEntregar.filter(p => p.canal === 'final')];
+  const pedPorId = new Map(pedFinal.map(p => [p.id, p]));
+  for (const p of pedFinal) { p.calc.anticipo = 0; }
+  const sinPedido = new Map();
+  for (const a of d.anticipos) {
+    const p = a.pedidoId && pedPorId.get(a.pedidoId);
+    if (p) p.calc.anticipo += n(a.valor);
+    else sinPedido.set(a.clienteId, (sinPedido.get(a.clienteId) || 0) + n(a.valor));
+  }
+  for (const p of pedFinal) { p.calc.pagado += p.calc.anticipo; p.calc.saldo = p.calc.total - p.calc.pagado; }
+  const anticipoLibre = new Map();
+  for (const [cid, monto] of sinPedido) {
+    let pool = monto;
+    const suyos = pedFinal.filter(p => p.ref.clienteId === cid && p.calc.saldo > 0.5).sort((a, b) => (a.ref.estado === 'Pendiente') - (b.ref.estado === 'Pendiente') || (a.fecha || '').localeCompare(b.fecha || ''));
+    for (const p of suyos) { const x = Math.min(pool, p.calc.saldo); p.calc.anticipo += x; p.calc.pagado += x; p.calc.saldo -= x; pool -= x; }
+    if (pool > 0.5) anticipoLibre.set(cid, pool);
+  }
+  // Plata recibida de clientes finales por pedidos que no han salido (o sin pedido): se le debe al cliente hasta entregar.
+  const anticiposFinal = sum(porEntregar.filter(p => p.canal === 'final'), p => Math.min(p.calc.pagado, p.calc.total)) + sum([...anticipoLibre.values()]);
   const finalSaldo = sum(entries.filter(e => e.canal === 'final'), e => Math.max(0, e.calc.saldo));
   const mayorSaldo = sum([...cartera.values()], c => Math.max(0, c.saldo));
-  const anticipos = sum([...cartera.values()], c => Math.max(0, -c.saldo));
+  const mayorFavor = sum([...cartera.values()], c => Math.max(0, -c.saldo));
 
   const allDates = [
     ...d.ventas, ...d.abonos, ...d.bbDespachos, ...d.bbVentas, ...d.bbPagos, ...d.pineraCompras, ...d.pineraPagos, ...d.gastos,
   ].map(x => x.fecha).filter(isDate).sort();
 
   porEntregar.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, anticipos, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
+  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, anticiposFinal, anticipoLibre, mayorSaldo, mayorFavor, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
   MODEL_KEY = key;
   return MODEL;
 }
@@ -1184,8 +1243,8 @@ function renderBanner() {
 }
 
 const MENU = [
-  ['Ventas', [['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final']]],
-  ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta reportada por Rubén'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto'], ['bb-danada', 'Pieza dañada']]],
+  ['Ventas', [['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final'], ['anticipo', 'Anticipo de cliente final']]],
+  ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta reportada por Rubén'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto']]],
   ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto'], ['campana', 'Campaña de pauta'], ['pauta-real', 'Cobro real de pauta del mes']]],
   ['Nómina', [['nomina-pago', 'Pago de nómina'], ['nomina-cargo', 'Trabajo extra']]],
   ['Configuración', [['cliente', 'Cliente mayorista'], ['cliente-final', 'Cliente final'], ['lista', 'Lista de precios']]],
@@ -1254,7 +1313,7 @@ function alertas(M) {
   for (const p of M.porEntregar) {
     const dd = diffDays(M.hoy, p.fecha);
     out.push([dd < 0 ? 'crit' : dd <= 7 ? 'warn' : 'info', `Entrega a ${p.cliente}: ${num(p.calc.piezas, 0)} pzs por ${cop(p.calc.total)}`,
-      dd < 0 ? `Estaba para el ${fmtDate(p.fecha)}. Márcalo como entregado cuando salga.` : dd === 0 ? 'La entrega es hoy.' : `Para el ${fmtDate(p.fecha)}, en ${dd} ${dd === 1 ? 'día' : 'días'}.`, 'mayoristas']);
+      dd < 0 ? `Estaba para el ${fmtDate(p.fecha)}. Márcalo como ${p.canal === 'final' ? 'despachado' : 'entregado'} cuando salga.` : dd === 0 ? 'La entrega es hoy.' : `Para el ${fmtDate(p.fecha)}, en ${dd} ${dd === 1 ? 'día' : 'días'}.`, p.canal === 'final' ? 'final' : 'mayoristas']);
   }
   for (const c of M.cartera.values()) {
     if (c.vencido > 0.5) out.push(['crit', `${c.cliente.nombre} tiene ${cop(c.vencido)} vencido`, `Lleva ${c.mora} días de mora. Saldo total ${cop(c.saldo)}.`, 'mayoristas']);
@@ -1286,6 +1345,41 @@ function onboarding() {
 }
 
 /* ---------- Resumen ---------- */
+// Pendientes: pedidos que faltan por entregar y quién le debe a quién hoy.
+function pendientes(M) {
+  const PE = M.porEntregar;
+  const tp = table([
+    { h: 'Entrega', f: p => { const dd = diffDays(M.hoy, p.fecha); return `<span class="num">${fmtDate(p.fecha)}</span><span class="sub ${dd < 0 ? 'neg' : ''}">${dd < 0 ? `atrasado ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`}</span>`; } },
+    { h: 'Cliente', f: p => `<span class="cell-strong">${esc(p.cliente)}</span><span class="sub">${p.canal === 'final' ? 'Cliente final' : 'Mayorista'} · ${num(p.calc.piezas, 0)} pzs · ${num(p.calc.rastras)} rastras</span>` },
+    { h: 'Total', r: 1, f: p => cop(p.calc.total) },
+    { h: 'Anticipo', r: 1, f: p => p.calc.pagado > 0.5 ? cop(p.calc.pagado) : '<span class="muted">—</span>' },
+    { h: 'Cobrar al entregar', r: 1, f: p => `<b>${cop(Math.max(0, p.calc.total - p.calc.pagado))}</b>` },
+  ], PE, { act: p => editAttr('ventas', p.id), empty: '<p class="muted">No hay pedidos por entregar.</p>',
+    foot: PE.length > 1 ? ['Total', '', cop(sum(PE, p => p.calc.total)), cop(sum(PE, p => p.calc.pagado)), cop(sum(PE, p => Math.max(0, p.calc.total - p.calc.pagado)))] : null });
+
+  const fila = (label, sub, v, view) => `<div${view ? ` class="lk" data-act="nav" data-v="${view}" role="button" tabindex="0"` : ''}><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${cop(v)}</b></div>`;
+  const deben = [], debes = [];
+  for (const k of M.cartera.values()) {
+    if (k.saldo > 0.5) deben.push([k.cliente.nombre, k.vencido > 0.5 ? `Mayorista · ${cop(k.vencido)} vencido` : k.prox ? `Mayorista · vence el ${fmtDay(k.prox)}` : 'Mayorista', k.saldo, 'mayoristas']);
+    else if (k.saldo < -0.5) debes.push([k.cliente.nombre, 'Saldo a favor del mayorista', -k.saldo, 'mayoristas']);
+  }
+  if (M.bbSaldo > 0.5) deben.push([M.cfg.socio, `Ventas de ${M.cfg.punto}`, M.bbSaldo, 'bb']);
+  const finDeben = new Map();
+  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) { const r = finDeben.get(e.cliente) || [0, 0]; r[0] += e.calc.saldo; r[1]++; finDeben.set(e.cliente, r); }
+  for (const [nm, [v, k]] of finDeben) deben.push([nm, `Cliente final · ${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'}`, v, 'final']);
+  if (M.pineraSaldo > 0.5) debes.push(['La pinera', 'Compra de madera', M.pineraSaldo, 'compras']);
+  for (const t of M.trab) { const v = M.nominaSaldo.get(t.id) || 0; if (v > 0.5) debes.push([t.nombre, `Nómina · se paga el sábado ${fmtDay(sabadoDe(M.hoy))}`, v, 'nomina']); }
+  const antCli = new Map();
+  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.pagado > 0.5) antCli.set(p.cliente, (antCli.get(p.cliente) || 0) + Math.min(p.calc.pagado, p.calc.total));
+  for (const [cid, v] of M.anticipoLibre) { const nm = M.cli.get(cid)?.nombre || 'Cliente final'; antCli.set(nm, (antCli.get(nm) || 0) + v); }
+  for (const [nm, v] of antCli) debes.push([nm, 'Anticipo de cliente final · madera por entregar', v, 'final']);
+  const bloque = (titulo, rows, vacio) => `<h4 class="ldg-h">${titulo}</h4><div class="ledger">${rows.length ? rows.sort((a, b) => b[2] - a[2]).map(r => fila(...r)).join('') + (rows.length > 1 ? `<div class="total"><span>Total</span><b>${cop(sum(rows, r => r[2]))}</b></div>` : '') : `<div><span class="muted">${vacio}</span><b></b></div>`}</div>`;
+  const deudas = bloque('Te deben', deben, 'Nadie te debe.') + bloque('Tú debes', debes, 'No debes nada.');
+  return `<div class="grid g-2-1">
+    ${card('Pedidos por entregar', tp, { sub: 'Mayoristas y clientes finales. Toca uno para marcarlo cuando salga.' })}
+    ${card('Deudas', deudas, { sub: 'Lo que te deben y lo que debes hoy, sin importar el rango de fechas.' })}
+  </div>`;
+}
 VIEW_FN.resumen = R => {
   const M = model();
   const P = periodo(M, R);
@@ -1303,13 +1397,13 @@ VIEW_FN.resumen = R => {
     ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas')}
   </div>`;
   const pos = `<div class="kpis soft">
-    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}${M.anticipos > 0.5 ? ` · Anticipos de mayoristas ${cop(M.anticipos, true)}` : ''}`, { cls: 'sm' })}
-    ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), M.pineraSaldo >= 0 ? 'Le debes' : 'A tu favor', { cls: 'sm' })}
+    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm' })}
+    ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), Math.abs(M.pineraSaldo) < 0.5 ? 'Sin saldo' : M.pineraSaldo > 0 ? 'Le debes' : 'A tu favor', { cls: 'sm' })}
     ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `${cop(invVal)} a precio de sociedad`, { cls: 'sm' })}
     ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm' })}
   </div>`;
 
-  if (!M.firstDate) return top + onboarding();
+  if (!M.firstDate) return top + pendientes(M) + onboarding();
 
   const canales = ['mayorista', 'bb', 'final'].map(k => ({ label: CANAL[k].label, color: CANAL[k].color, value: sum(P.E.filter(e => e.canal === k), e => e.ingreso), util: sum(P.E.filter(e => e.canal === k), e => e.util), rastras: sum(P.E.filter(e => e.canal === k), e => e.rastras) }));
   const totCan = sum(canales, c => c.value);
@@ -1334,7 +1428,7 @@ VIEW_FN.resumen = R => {
     { h: 'Utilidad', r: 1, f: e => signed(e.util) },
   ], P.E.slice(0, 8), { act: e => editAttr(e.src, e.id), empty: '<p>No hay ventas en este período.</p>' });
 
-  return `${top}${pos}
+  return `${top}${pos}${pendientes(M)}
     <div class="grid g-2-1">
       ${card('Ventas y utilidad', trendLegend('Ventas', 'Utilidad neta') + trendChart(R, P.E, [...P.G, ...P.PD, ...P.NX]), { sub: 'Lo que te queda a ti en cada canal, después de costos, gastos y pauta.' })}
       ${card('Ventas por canal', donut, { sub: 'Barro Blanco cuenta lo que Rubén te liquida.' })}
@@ -1367,11 +1461,11 @@ VIEW_FN.mayoristas = R => {
     const k = M.cartera.get(c.id);
     const mine = E.filter(e => e.ref.clienteId === c.id);
     const lista = M.listas.get(c.listaId);
-    const st = k.vencido > 0.5 ? chip('crit', `${cop(k.vencido, true)} vencido`, 'alert') : k.saldo > 0.5 ? chip('', 'Al día', 'clock') : k.saldo < -0.5 ? chip('good', `Anticipo ${cop(-k.saldo, true)}`, 'check') : chip('good', 'Sin deuda', 'check');
-    const pe = M.porEntregar.filter(p => p.ref.clienteId === c.id);
+    const st = k.vencido > 0.5 ? chip('crit', `${cop(k.vencido, true)} vencido`, 'alert') : k.saldo > 0.5 ? chip('', 'Al día', 'clock') : k.saldo < -0.5 ? chip('good', `Saldo a favor ${cop(-k.saldo, true)}`, 'check') : chip('good', 'Sin deuda', 'check');
+    const pe = M.porEntregar.filter(p => p.canal === 'mayorista' && p.ref.clienteId === c.id);
     return `<button type="button" class="client" data-act="cli" data-id="${esc(c.id)}" aria-pressed="${sel === c.id}">
       <div class="client-h"><div><b>${esc(c.nombre)}</b><span>${esc(lista ? lista.nombre : 'Sin lista de precios')} · ${k.dias ? `${k.dias} días de crédito` : 'De contado'}${n(c.saldoInicial) ? ` · arrancó ${n(c.saldoInicial) > 0 ? 'debiendo' : 'con'} ${cop(Math.abs(n(c.saldoInicial)), true)}${n(c.saldoInicial) < 0 ? ' a favor' : ''}` : ''}</span></div>${st}</div>
-      <dl><div><dt>${k.saldo < -0.5 ? 'Anticipo' : 'Saldo'}</dt><dd>${cop(Math.abs(k.saldo))}</dd></div><div><dt>${pe.length ? 'Por entregar' : 'Próximo vence'}</dt><dd>${pe.length ? `${fmtDay(pe[0].fecha)} · ${num(sum(pe, p => p.calc.piezas), 0)} pzs` : k.prox ? fmtDay(k.prox) : '—'}</dd></div>
+      <dl><div><dt>${k.saldo < -0.5 ? 'Saldo a favor' : 'Saldo'}</dt><dd>${cop(Math.abs(k.saldo))}</dd></div><div><dt>${pe.length ? 'Por entregar' : 'Próximo vence'}</dt><dd>${pe.length ? `${fmtDay(pe[0].fecha)} · ${num(sum(pe, p => p.calc.piezas), 0)} pzs` : k.prox ? fmtDay(k.prox) : '—'}</dd></div>
       <div><dt>Rastras período</dt><dd>${num(sum(mine, e => e.rastras))}</dd></div><div><dt>Utilidad período</dt><dd>${cop(sum(mine, e => e.util), true)}</dd></div></dl>
     </button>`;
   }).join('');
@@ -1387,7 +1481,7 @@ VIEW_FN.mayoristas = R => {
     ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)' })}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
     ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`)}
-    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${antTot > 0.5 ? ` · ${cop(antTot)} de anticipos a favor de clientes` : ''}`)}
+    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`)}
   </div>`;
   const ped = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
@@ -1407,7 +1501,7 @@ VIEW_FN.mayoristas = R => {
     { h: 'Valor', r: 1, f: a => cop(a.valor) },
   ], A, { act: a => editAttr('abonos', a.id), empty: '<p>No hay abonos en este período.</p>', foot: A.length > 1 ? ['Total', '', '', '', cop(sum(A, a => a.valor))] : null });
 
-  const PE = M.porEntregar.filter(p => !sel || p.ref.clienteId === sel);
+  const PE = M.porEntregar.filter(p => p.canal === 'mayorista' && (!sel || p.ref.clienteId === sel));
   const peCard = PE.length ? card('Por entregar', table([
     { h: 'Entrega', f: p => { const dd = diffDays(M.hoy, p.fecha); return `<span class="num">${fmtDate(p.fecha)}</span><span class="sub">${dd < 0 ? `hace ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`}</span>`; } },
     { h: 'Cliente', f: p => esc(p.cliente) },
@@ -1428,9 +1522,10 @@ VIEW_FN.mayoristas = R => {
 VIEW_FN.bb = R => {
   const M = model(), cfg = M.cfg, p = n(cfg.pctSocio);
   const head = `<div class="section-h"><p>Sociedad con ${esc(cfg.socio)} en ${esc(cfg.punto)}. Le despachas a precio de sociedad; cuando vende, la utilidad sobre ese precio se reparte ${p}/${100 - p}. ${esc(cfg.socio)} te liquida el precio de sociedad más tu parte.</p>
-    <div class="acts">${S.sample ? btn(`${icon('spark')}Pegar mensaje de ${esc(cfg.socio)}`, 'data-act="form" data-form="ai"', 'sm') : ''}${addBtn('Venta reportada', 'bb-venta', 'primary sm')}${addBtn('Despacho', 'bb-despacho')}${addBtn('Pago', 'bb-pago')}${addBtn('Devolución', 'bb-devolucion')}${addBtn('Pieza dañada', 'bb-danada')}</div></div>`;
+    <div class="acts">${S.sample ? btn(`${icon('spark')}Pegar mensaje de ${esc(cfg.socio)}`, 'data-act="form" data-form="ai"', 'sm') : ''}${addBtn('Venta reportada', 'bb-venta', 'primary sm')}${addBtn('Despacho', 'bb-despacho')}${addBtn('Pago', 'bb-pago')}${addBtn('Devolución', 'bb-devolucion')}</div></div>`;
   const inv = [...M.inv.values()].filter(r => r.desp > 0 || r.vend > 0).sort((a, b) => (a.nombre).localeCompare(b.nombre, 'es', { numeric: true }));
-  if (!inv.length && !M.d.bbPagos.length) return head + card('', emptyState('Todavía no hay movimientos con Barro Blanco', `Registra el primer despacho con la relación de despacho: medidas, largos y cantidades. El precio de sociedad sale de la lista “${esc(M.listaBB ? M.listaBB.nombre : 'Sociedad Barro Blanco')}”.`, addBtn('Despacho al punto', 'bb-despacho', '')));
+  if (!inv.length && !M.d.bbPagos.length) return head + card('', emptyState('Todavía no hay movimientos con Barro Blanco', `Registra el primer despacho con la relación de despacho: medidas, largos y cantidades. El precio de sociedad sale de la lista “${esc(M.listaBB ? M.listaBB.nombre : 'Sociedad Barro Blanco')}”.`, addBtn('Despacho al punto', 'bb-despacho', '')))
+    + card(`Inventario en ${esc(cfg.punto)}`, `<div class="inv-res"><div><span>Piezas</span><b>0</b></div><div><span>Rastras</span><b>0</b></div><div><span>Referencias</span><b>0</b></div><div><span>A precio de sociedad</span><b>$0</b></div><div><span>Tu costo</span><b>$0</b></div><div><span>Por acabarse</span><b>0</b></div></div><p class="muted">Cuando registres el primer despacho, aquí ves cada pieza que hay en el punto, lo vendido y lo que queda.</p>`, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido.' });
 
   const E = M.bbEntries.filter(e => inR(e.fecha, R));
   const k = f => sum(E, e => f(e.calc));
@@ -1447,14 +1542,16 @@ VIEW_FN.bb = R => {
 
   const invT = table([
     { h: 'Pieza', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${num(r.rastras, 3)} rastras/pza</span>` },
-    { h: 'Despachado', r: 1, f: r => num(r.desp - r.dev, 0) },
+    { h: 'Despachado', r: 1, f: r => `${num(r.desp, 0)}${r.dev ? `<span class="sub">−${num(r.dev, 0)} devueltas</span>` : ''}` },
     { h: 'Vendido', r: 1, f: r => num(r.vend, 0) },
-    { h: 'En el punto', r: 1, f: r => `<b>${num(r.stock, 0)}</b>` },
+    { h: 'En el punto', r: 1, f: r => `<b>${num(r.stock, 0)}</b><span class="sub">${num(Math.max(0, r.stock) * r.rastras)} rastras</span>` },
     { h: '', f: r => { const tot = Math.max(1, r.desp - r.dev); const f = Math.max(0, r.stock) / tot; return `<div class="meter ${r.stock <= 0 ? 'out' : r.stock <= n(cfg.stockMin) ? 'low' : ''}"><i style="width:${(f * 100).toFixed(0)}%"></i></div>`; } },
     { h: 'Precio sociedad', r: 1, f: r => cop(r.pbb) },
     ...(M.listaBBVenta ? [{ h: 'Precio venta', r: 1, f: r => { const pv = listaPrecio(M.listaBBVenta, r.medida, r.largo); return pv ? cop(pv) : '<span class="muted">—</span>'; } }] : []),
     { h: 'Valor', r: 1, f: r => cop(Math.max(0, r.stock) * r.pbb) },
-  ], inv, { empty: '<p>No hay piezas en el punto.</p>', foot: inv.length > 1 ? ['Total', num(sum(inv, r => r.desp - r.dev), 0), num(sum(inv, r => r.vend), 0), num(invPzs, 0), '', '', cop(invVal)] : null });
+  ], inv, { empty: '<p>No hay piezas en el punto.</p>', foot: inv.length > 1 ? ['Total', num(sum(inv, r => r.desp - r.dev), 0), num(sum(inv, r => r.vend), 0), num(invPzs, 0), '', '', ...(M.listaBBVenta ? [''] : []), cop(invVal)] : null });
+  const invRas = sum(inv, r => Math.max(0, r.stock) * r.rastras), bajos = inv.filter(r => r.desp > 0 && r.stock <= n(cfg.stockMin));
+  const invRes = `<div class="inv-res"><div><span>Piezas</span><b>${num(invPzs, 0)}</b></div><div><span>Rastras</span><b>${num(invRas)}</b></div><div><span>Referencias</span><b>${num(inv.filter(r => r.stock > 0).length, 0)}</b></div><div><span>A precio de sociedad</span><b>${cop(invVal, true)}</b></div><div><span>Tu costo</span><b>${cop(invCost, true)}</b></div><div><span>Por acabarse</span><b class="${bajos.length ? 'neg' : ''}">${num(bajos.length, 0)}</b></div></div>`;
 
   // Si ya está la lista de venta de la sociedad: cuánto deja el inventario si se vende todo a precio de lista.
   let proyeccion = '';
@@ -1480,6 +1577,7 @@ VIEW_FN.bb = R => {
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
     { h: 'Detalle', f: e => `${e.ref.danada ? chip('crit', 'Dañada', 'alert') + ' ' : ''}${detalle(e.lines)}` },
     { h: 'Venta punto', r: 1, f: e => cop(e.calc.venta) },
+    { h: 'Sobre lista', r: 1, f: e => { const L = e.lines.filter(l => n(l.plista)); if (!L.length) return '<span class="muted">—</span>'; const d = sum(L, l => l.cant * (n(l.precio) - n(l.plista))); return Math.abs(d) < 1 ? '<span class="muted">A lista</span>' : `<span class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${cop(Math.abs(d))}</span>`; } },
     { h: 'Utilidad punto', r: 1, f: e => signed(e.calc.utilPunto) },
     { h: 'Tu parte', r: 1, f: e => signed(e.calc.miParte) },
     { h: 'Te liquida', r: 1, f: e => cop(e.calc.debe) },
@@ -1487,7 +1585,7 @@ VIEW_FN.bb = R => {
   const D0 = M.d.bbDespachos.filter(x => inR(x.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const dt = table([
     { h: 'Fecha', f: x => `<span class="num">${fmtDate(x.fecha)}</span>` },
-    { h: 'Tipo', f: x => x.tipo === 'devolucion' ? chip('warn', 'Devolución') : chip('', 'Despacho') },
+    { h: 'Tipo', f: x => x.tipo === 'devolucion' ? `${chip('warn', 'Devolución')}<span class="sub">${esc([x.motivo, x.motivoDetalle].filter(Boolean).join(' · '))}</span>` : chip('', 'Despacho') },
     { h: 'Remisión', f: x => `<span class="num">${esc(x.remision || '—')}</span>` },
     { h: 'Detalle', f: x => detalle(calcVenta(x).lines) },
     { h: 'Rastras', r: 1, f: x => num(calcVenta(x).rastras) },
@@ -1502,55 +1600,75 @@ VIEW_FN.bb = R => {
   ], P0, { act: x => editAttr('bbPagos', x.id), empty: '<p>No hay pagos en este período.</p>' });
 
   return `${head}${kp}
-    <div class="grid g-2-1">
-      ${card('Inventario en el punto', invT, { sub: 'Despachado menos devuelto menos vendido. El precio es el del último despacho.' })}
+    ${card(`Inventario en ${esc(cfg.punto)}`, invRes + invT, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido. El precio de sociedad es el del último despacho de cada pieza.', acts: addBtn('Despacho', 'bb-despacho') + addBtn('Devolución', 'bb-devolucion') })}
+    <div class="grid g-1-1">
       ${card('Liquidación del período', liq, { sub: 'Cómo se reparte lo que se vendió en el rango elegido.' })}
+      ${card(`Pagos de ${esc(cfg.socio)}`, pt, { acts: addBtn('Pago', 'bb-pago') })}
     </div>
-    ${card('Ventas reportadas', vt, { acts: addBtn('Venta reportada', 'bb-venta') })}
-    <div class="grid g-1-1">${card('Despachos y devoluciones', dt)}${card(`Pagos de ${esc(cfg.socio)}`, pt)}</div>`;
+    ${card('Ventas reportadas', vt, { sub: `Si ${esc(cfg.socio)} vende más caro que la lista, la diferencia también se reparte ${p}/${100 - p}.`, acts: addBtn('Venta reportada', 'bb-venta') })}
+    ${card('Despachos y devoluciones', dt, { acts: addBtn('Despacho', 'bb-despacho') + addBtn('Devolución', 'bb-devolucion') })}`;
 };
 
 /* ---------- Cliente final ---------- */
 const waLink = cel => { const d = String(cel || '').replace(/\D/g, ''); if (d.length < 7) return ''; const full = d.length === 10 ? '57' + d : d; return `<a href="https://wa.me/${full}" target="_blank" rel="noopener" class="chip good" style="text-decoration:none">WhatsApp</a>`; };
 VIEW_FN.final = R => {
   const M = model();
-  const head = `<div class="section-h"><p>Personas, constructoras y arquitectos que compran directo: a quién, a dónde se entrega, cuánto se cobró y cuánto falta por pagar.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}${addBtn('Cliente', 'cliente-final')}</div></div>`;
+  const head = `<div class="section-h"><p>Personas, constructoras y arquitectos que compran directo: a quién, a dónde se entrega, cuánto se cobró, cuánto dieron de anticipo y cuánto falta por pagar. Un pedido pendiente no cuenta como venta hasta que lo marques despachado.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}${addBtn('Anticipo', 'anticipo')}${addBtn('Cliente', 'cliente-final')}</div></div>`;
   const all = M.entries.filter(e => e.canal === 'final');
+  const pend = M.porEntregar.filter(p => p.canal === 'final');
 
   // Directorio: clientes guardados + los que solo aparecen en pedidos.
   const dir = new Map();
-  for (const c of M.finales) dir.set('id:' + c.id, { id: c.id, nombre: c.nombre, empresa: c.empresa || '', oficio: c.oficio || '', celular: c.celular || '', municipio: c.municipio || '', n: 0, total: 0, saldo: 0, ultima: '' });
+  const nuevo = (o = {}) => ({ id: '', nombre: 'Sin nombre', empresa: '', oficio: '', celular: '', municipio: '', n: 0, total: 0, saldo: 0, anticipo: 0, pend: 0, ultima: '', ...o });
+  for (const c of M.finales) dir.set('id:' + c.id, nuevo({ id: c.id, nombre: c.nombre, empresa: c.empresa || '', oficio: c.oficio || '', celular: c.celular || '', municipio: c.municipio || '', anticipo: M.anticipoLibre.get(c.id) || 0 }));
+  const keyOf = v => { const c = v.cliente || {}; return v.clienteId && dir.has('id:' + v.clienteId) ? 'id:' + v.clienteId : (String(c.celular || '').replace(/\D/g, '') || (c.nombre || '').toLowerCase()); };
   for (const e of all) {
-    const c = e.ref.cliente || {};
-    const key = e.ref.clienteId && dir.has('id:' + e.ref.clienteId) ? 'id:' + e.ref.clienteId : (String(c.celular || '').replace(/\D/g, '') || (c.nombre || '').toLowerCase());
-    const r = dir.get(key) || { nombre: c.nombre || 'Sin nombre', empresa: '', oficio: '', celular: c.celular || '', municipio: c.municipio || '', n: 0, total: 0, saldo: 0, ultima: '' };
+    const key = keyOf(e.ref), c = e.ref.cliente || {};
+    const r = dir.get(key) || nuevo({ nombre: c.nombre || 'Sin nombre', celular: c.celular || '', municipio: c.municipio || '' });
     r.n++; r.total += e.ingreso; r.saldo += Math.max(0, e.calc.saldo); if ((e.fecha || '') > r.ultima) r.ultima = e.fecha; dir.set(key, r);
   }
+  for (const p of pend) {
+    const key = keyOf(p.ref), c = p.ref.cliente || {};
+    const r = dir.get(key) || nuevo({ nombre: c.nombre || 'Sin nombre', celular: c.celular || '', municipio: c.municipio || '' });
+    r.pend++; r.anticipo += Math.min(p.calc.pagado, p.calc.total); dir.set(key, r);
+  }
   const dt = table([
-    { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${esc([r.empresa, r.oficio && r.oficio !== 'Persona' ? r.oficio : ''].filter(Boolean).join(' · ') || r.municipio)}</span>` },
+    { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${esc([r.empresa !== r.nombre ? r.empresa : '', r.oficio && r.oficio !== 'Persona' ? r.oficio : ''].filter(Boolean).join(' · '))}</span>` },
     { h: 'Municipio', f: r => esc(r.municipio || '—') },
-    { h: 'Celular', f: r => `<span class="num">${esc(r.celular || '—')}</span>` },
-    { h: '', f: r => waLink(r.celular) },
-    { h: 'Pedidos', r: 1, f: r => num(r.n, 0) },
+    { h: 'Celular', f: r => `<span class="num">${esc(r.celular || '—')}</span>${waLink(r.celular)}` },
+    { h: 'Pedidos', r: 1, f: r => r.n || !r.pend ? `${num(r.n, 0)}${r.pend ? `<span class="sub">+${r.pend} por entregar</span>` : ''}` : `<span class="sub">${r.pend} por entregar</span>` },
     { h: 'Comprado', r: 1, f: r => cop(r.total) },
-    { h: 'Saldo', r: 1, f: r => r.saldo > 0.5 ? `<span class="neg">${cop(r.saldo)}</span>` : '<span class="muted">$0</span>' },
-    { h: 'Último', r: 1, f: r => r.ultima ? fmtDate(r.ultima) : '—' },
+    { h: 'Anticipo', r: 1, f: r => r.anticipo > 0.5 ? cop(r.anticipo) : '<span class="muted">—</span>' },
+    { h: 'Debe', r: 1, f: r => r.saldo > 0.5 ? `<span class="neg">${cop(r.saldo)}</span>` : '<span class="muted">$0</span>' },
+    { h: '', f: r => r.id ? `<button type="button" class="icon-btn" data-act="cli-menu" data-id="${esc(r.id)}" aria-label="Opciones de ${esc(r.nombre)}" aria-haspopup="true">${icon('dots')}</button>` : '' },
   ], [...dir.values()].sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre)), {
     act: r => r.id ? editAttr('clientes', r.id) : '',
     empty: emptyState('Sin clientes finales', 'Guarda a tus clientes para elegirlos rápido al hacer un pedido.', addBtn('Cliente final', 'cliente-final', '')),
   });
-  const dirCard = card('Directorio de clientes', dt, { sub: 'De mayor a menor compra. Toca un cliente guardado para editar sus datos.', acts: addBtn('Cliente', 'cliente-final') });
+  const dirCard = card('Directorio de clientes', dt, { sub: 'Toca un cliente para editarlo, o los tres puntos para cargarle un pedido o un anticipo.', acts: addBtn('Cliente', 'cliente-final') });
 
-  if (!all.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido: elige el cliente o escribe su nombre, celular y dirección. La utilidad se calcula con el costo real de cada pieza.', addBtn('Pedido de cliente final', 'venta-final', ''))) + dirCard;
+  if (!all.length && !pend.length && !M.d.anticipos.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido: elige el cliente o escribe su nombre, celular y dirección. Si te da un anticipo, cárgalo con el botón Anticipo.', addBtn('Pedido de cliente final', 'venta-final', '') + addBtn('Anticipo', 'anticipo', ''))) + dirCard;
 
   const E = all.filter(e => inR(e.fecha, R));
   const ing = sum(E, e => e.ingreso), ut = sum(E, e => e.util);
   const kp = `<div class="kpis">
-    ${kpi('Pedidos', num(E.length, 0), `${num(sum(E, e => e.piezas), 0)} piezas · ${num(sum(E, e => e.rastras))} rastras`, { dot: 'var(--s3)' })}
+    ${kpi('Pedidos despachados', num(E.length, 0), `${num(sum(E, e => e.piezas), 0)} piezas · ${num(sum(E, e => e.rastras))} rastras`, { dot: 'var(--s3)' })}
     ${kpi('Ventas', cop(ing), `Ticket promedio ${cop(E.length ? ing / E.length : 0)}`)}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
-    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${all.filter(e => e.calc.saldo > 0.5).length} pedidos con saldo`)}
+    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${(k => `${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'} con saldo`)(all.filter(e => e.calc.saldo > 0.5).length)}${M.anticiposFinal > 0.5 ? ` · ${cop(M.anticiposFinal, true)} en anticipos` : ''}`)}
   </div>`;
+
+  const pc = pend.length ? card('Por entregar', table([
+    { h: 'Entrega', f: p => { const dd = diffDays(M.hoy, p.fecha); return `<span class="num">${fmtDate(p.fecha)}</span><span class="sub">${dd < 0 ? `hace ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`}</span>`; } },
+    { h: 'Cliente', f: p => `<span class="cell-strong">${esc(p.cliente)}</span><span class="sub">${esc(p.ref.cliente?.municipio || '')}</span>` },
+    { h: 'Detalle', f: p => detalle(p.lines) },
+    { h: 'Total', r: 1, f: p => cop(p.calc.total) },
+    { h: 'Anticipo', r: 1, f: p => p.calc.pagado > 0.5 ? `${cop(p.calc.pagado)}<span class="sub">${pct(p.calc.pagado / p.calc.total)}</span>` : '<span class="muted">Sin anticipo</span>' },
+    { h: 'Cobrar al entregar', r: 1, f: p => `<b>${cop(Math.max(0, p.calc.saldo))}</b>` },
+    { h: '', f: p => p.ref.clienteId ? btn(`${icon('plus')}Anticipo`, `data-act="form" data-form="anticipo" data-cli="${esc(p.ref.clienteId)}" data-pedido="${esc(p.id)}"`, 'sm') : '' },
+  ], pend, { act: p => editAttr('ventas', p.id), foot: pend.length > 1 ? ['Total', '', '', cop(sum(pend, p => p.calc.total)), cop(sum(pend, p => p.calc.pagado)), cop(sum(pend, p => Math.max(0, p.calc.saldo))), ''] : null }),
+    { sub: 'Pedidos confirmados que todavía no salen. Cuando salgan, ábrelos y márcalos como despachados: ahí cuentan como venta y el saldo pasa a cobrar.' }) : '';
+
   const tone = { Pendiente: 'warn', Despachado: '', Entregado: 'good' };
   const t = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
@@ -1559,11 +1677,26 @@ VIEW_FN.final = R => {
     { h: 'Detalle', f: e => detalle(e.lines) },
     { h: 'Total', r: 1, f: e => cop(e.ingreso) },
     { h: 'Utilidad', r: 1, f: e => signed(e.util) },
-    { h: 'Saldo', r: 1, f: e => e.calc.saldo > 0.5 ? `<span class="neg">${cop(e.calc.saldo)}</span>` : '<span class="muted">$0</span>' },
-    { h: 'Estado', f: e => `<div class="pills">${chip(tone[e.ref.estado || 'Pendiente'], e.ref.estado || 'Pendiente')}${e.calc.saldo <= 0.5 ? chip('good', 'Pagado', 'check') : ''}</div>` },
-  ], E, { act: e => editAttr('ventas', e.id), empty: '<p>No hay pedidos en este período.</p>' });
-  return `${head}${kp}${card('Pedidos', t)}
-    <div class="grid g-1-1">${card('Ventas y utilidad', trendLegend() + trendChart(R, E, [], { h: 200 }))}${dirCard}</div>`;
+    { h: 'Pagado', r: 1, f: e => e.calc.pagado > 0.5 ? cop(e.calc.pagado) : '<span class="muted">$0</span>' },
+    { h: 'Debe', r: 1, f: e => e.calc.saldo > 0.5 ? `<span class="neg">${cop(e.calc.saldo)}</span>` : '<span class="muted">$0</span>' },
+    { h: 'Estado', f: e => `<div class="pills">${chip(tone[e.ref.estado] ?? '', e.ref.estado || 'Despachado')}${e.calc.saldo <= 0.5 ? chip('good', 'Pagado', 'check') : ''}</div>` },
+  ], E, { act: e => editAttr('ventas', e.id), empty: '<p>No hay pedidos despachados en este período.</p>' });
+
+  const A = M.d.anticipos.filter(a => inR(a.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const ped = id => [...all, ...pend].find(p => p.id === id);
+  const ta = table([
+    { h: 'Fecha', f: a => `<span class="num">${fmtDate(a.fecha)}</span>` },
+    { h: 'Cliente', f: a => esc(M.cli.get(a.clienteId)?.nombre || '—') },
+    { h: 'Pedido', f: a => { const p = ped(a.pedidoId); return p ? `${detalle(p.lines)}<span class="sub">Total ${cop(p.calc.total)}</span>` : '<span class="muted">Sin pedido: se aplica al más viejo</span>'; } },
+    { h: 'Medio', f: a => `${esc(a.medio || '—')}${a.nota ? `<span class="sub">${esc(a.nota)}</span>` : ''}` },
+    { h: 'Comprobante', f: a => fotoDe(a) ? `<a class="foto-link" href="${esc(fotoDe(a))}" target="_blank" rel="noopener" data-stop>Ver foto</a>` : '<span class="muted">—</span>' },
+    { h: 'Valor', r: 1, f: a => cop(a.valor) },
+  ], A, { act: a => editAttr('anticipos', a.id), empty: '<p>No hay anticipos en este período.</p>', foot: A.length > 1 ? ['Total', '', '', '', '', cop(sum(A, a => a.valor))] : null });
+
+  return `${head}${kp}${pc}${card('Pedidos despachados', t)}
+    ${card('Anticipos', ta, { sub: 'Plata que te dan antes de entregar. Se descuenta del pedido al que la cargues.', acts: addBtn('Anticipo', 'anticipo') })}
+    ${dirCard}
+    ${card('Ventas y utilidad', trendLegend() + trendChart(R, E, [], { h: 200 }))}`;
 };
 
 /* ---------- Compras y gastos (La Pinera + gastos) ---------- */
@@ -1622,7 +1755,13 @@ VIEW_FN.compras = R => {
 /* ---------- Pauta (publicidad en Meta) ---------- */
 const PLATAFORMAS = ['Meta (Facebook e Instagram)', 'Google', 'TikTok', 'Otra'];
 const campanas = (cfg = CFG()) => (cfg.pauta && Array.isArray(cfg.pauta.campanas) ? cfg.pauta.campanas : []);
-const campActiva = (c, f, hoy) => isDate(c.inicio) && f >= c.inicio && (!isDate(c.fin) || f <= c.fin) && f <= hoy;
+// Días que la campaña estuvo prendida: [{desde, hasta}] (hasta vacío = sigue prendida). Las campañas viejas usaban inicio/fin.
+const periodosDe = c => Array.isArray(c.periodos) ? c.periodos.filter(p => isDate(p.desde)) : isDate(c.inicio) ? [{ desde: c.inicio, hasta: c.fin || '' }] : [];
+const enPeriodo = (p, f) => f >= p.desde && (!isDate(p.hasta) || f <= p.hasta);
+const campActiva = (c, f, hoy) => f <= hoy && periodosDe(c).some(p => enPeriodo(p, f));
+const periodoHoy = (c, hoy) => periodosDe(c).find(p => enPeriodo(p, hoy));
+const primerDia = cs => cs.flatMap(c => periodosDe(c).map(p => p.desde)).sort()[0] || '';
+const mensualDe = c => n(c.presupuestoMensual) || n(c.presupuestoDiario) * 30;
 const finDeMes = mes => addDays(fromD(new Date(Date.UTC(+mes.slice(0, 4), +mes.slice(5, 7), 1))), -1);
 function diasActivosMes(c, mes, hoy) {
   let k = 0;
@@ -1633,7 +1772,7 @@ const tieneReal = (c, mes) => c.reales && c.reales[mes] !== undefined && c.reale
 // Gasto de pauta día por día: el cobro real del mes repartido entre sus días activos o, si no hay, el presupuesto diario.
 function pautaDias(cfg, from, to, hoy) {
   const out = [], cs = campanas(cfg);
-  const ini = cs.map(c => c.inicio).filter(isDate).sort()[0];
+  const ini = primerDia(cs);
   if (!ini) return out;
   const fin = to < hoy ? to : hoy, cache = new Map();
   for (let f = from < ini ? ini : from; f <= fin; f = addDays(f, 1)) {
@@ -1654,22 +1793,32 @@ function pautaDias(cfg, from, to, hoy) {
 
 VIEW_FN.pauta = R => {
   const M = model(), cfg = M.cfg, hoy = M.hoy, cs = campanas(cfg);
-  const head = `<div class="section-h"><p>Lo que inviertes en publicidad en Meta (Facebook e Instagram). El gasto se calcula con el presupuesto diario de cada campaña; si Meta te cobra otro valor en un mes, registra el cobro real y ese reemplaza el cálculo. La pauta se suma a los gastos y se resta de la utilidad neta.</p>
-    <div class="acts">${addBtn('Campaña', 'campana', 'primary sm')}${cs.length ? addBtn('Cobro real del mes', 'pauta-real') : ''}</div></div>`;
-  if (!cs.length) return head + card('', emptyState('Todavía no hay campañas', 'Crea tu campaña de Meta con su presupuesto diario y la fecha en que arrancó. El gasto de cada mes se calcula solo.', addBtn('Campaña', 'campana', '')));
+  const head = `<div class="section-h"><p>Lo que inviertes en publicidad en Meta (Facebook e Instagram). Mientras la pauta está prendida, cada día suma su presupuesto diario; apagada no suma nada. Si Meta te cobra otro valor en un mes, registra el cobro real y ese reemplaza el cálculo. La pauta se suma a los gastos y se resta de la utilidad neta.</p>
+    <div class="acts">${addBtn('Campaña', 'campana', cs.length ? 'sm' : 'primary sm')}${cs.length ? addBtn('Cobro real del mes', 'pauta-real') : ''}</div></div>`;
+  if (!cs.length) return head + card('', emptyState('Todavía no hay campañas', 'Crea tu campaña de Meta con su presupuesto mensual o diario. La prendes o la apagas con un interruptor y el gasto se calcula solo.', addBtn('Campaña', 'campana', '')));
+  const ctl = `<div class="pauta-ctls">${cs.map(c => {
+    const on = !!periodoHoy(c, hoy), ps = periodosDe(c), ult = ps.slice().sort((a, b) => a.desde.localeCompare(b.desde)).pop();
+    const desde = on ? `Prendida desde el ${fmtDate(periodoHoy(c, hoy).desde)}` : ult ? (isDate(ult.hasta) && ult.hasta < hoy ? `Apagada desde el ${fmtDate(addDays(ult.hasta, 1))}` : `Programada desde el ${fmtDate(ult.desde)}`) : 'Apagada · no ha estado prendida';
+    return `<div class="pauta-ctl">
+      <div class="pc-txt"><b>${esc(c.nombre)}</b><span>${esc(c.plataforma || '')}</span><span>${cop(mensualDe(c))} al mes · ${cop(c.presupuestoDiario)} al día</span></div>
+      <button type="button" class="switch" role="switch" aria-checked="${on}" data-act="pauta-switch" data-id="${esc(c.id)}"><i></i><span>${on ? 'Prendida' : 'Apagada'}</span></button>
+      <span class="pc-st">${esc(desde)}</span>
+      ${btn(`${icon('edit')}Presupuesto`, `data-act="campana-edit" data-id="${esc(c.id)}"`, 'sm')}
+    </div>`;
+  }).join('')}</div>`;
 
   const PD = pautaDias(cfg, R.from, R.to, hoy), pautaR = sum(PD, x => x.valor);
   const activas = cs.filter(c => campActiva(c, hoy, hoy));
   const diario = sum(activas, c => c.presupuestoDiario);
   const mes = hoy.slice(0, 7), fm = finDeMes(mes), quedan = diffDays(hoy, fm);
   const llevaMes = sum(pautaDias(cfg, mes + '-01', hoy, hoy), x => x.valor);
-  const proy = llevaMes + sum(activas, c => n(c.presupuestoDiario) * Math.max(0, isDate(c.fin) ? Math.min(quedan, diffDays(hoy, c.fin)) : quedan));
+  const proy = llevaMes + sum(activas, c => { const p = periodoHoy(c, hoy); return n(c.presupuestoDiario) * Math.max(0, isDate(p.hasta) ? Math.min(quedan, diffDays(hoy, p.hasta)) : quedan); });
   const fin = M.entries.filter(e => e.canal === 'final' && inR(e.fecha, R)), vf = sum(fin, e => e.ingreso);
 
   const kp = `<div class="kpis">
     ${kpi('Pauta del período', cop(pautaR), `${PD.length} ${PD.length === 1 ? 'día' : 'días'} con pauta · ya restada de la utilidad`, { dot: 'var(--s2)' })}
-    ${kpi('Presupuesto diario', cop(diario), `${activas.length} ${activas.length === 1 ? 'campaña activa' : 'campañas activas'} · ${cop(diario * 30, true)} al mes`)}
-    ${kpi(`Proyección de ${MESES[+mes.slice(5, 7) - 1]}`, cop(proy), `Llevas ${cop(llevaMes)}; si sigue igual hasta el ${fmtDay(fm)}`)}
+    ${kpi('Presupuesto diario', cop(diario), activas.length ? `${activas.length} ${activas.length === 1 ? 'campaña prendida' : 'campañas prendidas'} · ${cop(sum(activas, mensualDe), true)} al mes` : 'Pauta apagada: hoy no suma')}
+    ${kpi(`Proyección de ${MESES[+mes.slice(5, 7) - 1]}`, cop(proy), activas.length ? `Llevas ${cop(llevaMes)}; si sigue prendida hasta el ${fmtDay(fm)}` : `Llevas ${cop(llevaMes)}; apagada no suma más`)}
     ${kpi('Ventas a clientes finales por cada $1', pautaR && vf ? `$${num(vf / pautaR, 1)}` : '—', fin.length ? `${fin.length} ${fin.length === 1 ? 'pedido' : 'pedidos'} · ${cop(pautaR / fin.length)} de pauta por pedido` : 'Sin pedidos de clientes finales en el período')}
   </div>`;
 
@@ -1683,7 +1832,7 @@ VIEW_FN.pauta = R => {
   const leg = `<div class="legend"><span><i style="background:var(--s3)"></i>Ventas a clientes finales</span><span><i style="background:var(--s2)"></i>Pauta</span></div>`;
 
   // Mes a mes
-  const primero = cs.map(c => c.inicio).filter(isDate).sort()[0].slice(0, 7);
+  const primero = (primerDia(cs) || hoy).slice(0, 7);
   const meses = [];
   for (let m = mes; m >= primero && meses.length < 12; m = addDays(m + '-01', -1).slice(0, 7)) meses.push(m);
   const filas = meses.map(m => {
@@ -1707,17 +1856,17 @@ VIEW_FN.pauta = R => {
 
   const tc = table([
     { h: 'Campaña', f: c => `<span class="cell-strong">${esc(c.nombre)}</span><span class="sub">${esc(c.plataforma || '')}</span>` },
+    { h: 'Presupuesto mensual', r: 1, f: c => cop(mensualDe(c)) },
     { h: 'Presupuesto diario', r: 1, f: c => cop(c.presupuestoDiario) },
-    { h: 'Desde', f: c => `<span class="num">${fmtDate(c.inicio)}</span>` },
-    { h: 'Hasta', f: c => isDate(c.fin) ? `<span class="num">${fmtDate(c.fin)}</span>` : '<span class="muted">Sigue activa</span>' },
-    { h: 'Estado', f: c => c.inicio > hoy ? chip('', 'Programada', 'clock') : isDate(c.fin) && c.fin < hoy ? chip('', 'Terminada') : chip('good', 'Activa', 'check') },
-    { h: 'Gastado en total', r: 1, f: c => cop(sum(pautaDias({ pauta: { campanas: [c] } }, c.inicio, hoy, hoy), x => x.valor)) },
+    { h: 'Días prendida', f: c => { const ps = periodosDe(c); return ps.length ? ps.map(p => `<span class="num">${fmtDay(p.desde)} → ${isDate(p.hasta) ? fmtDay(p.hasta) : 'hoy'}</span>`).join('<br>') : '<span class="muted">Nunca</span>'; } },
+    { h: 'Estado', f: c => periodoHoy(c, hoy) ? chip('good', 'Prendida', 'check') : chip('', 'Apagada') },
+    { h: 'Gastado en total', r: 1, f: c => cop(sum(pautaDias({ pauta: { campanas: [c] } }, primerDia([c]) || hoy, hoy, hoy), x => x.valor)) },
   ], cs, { act: c => `data-act="campana-edit" data-id="${esc(c.id)}"` });
 
-  return `${head}${kp}
+  return `${head}${ctl}${kp}
     ${card('Pauta y ventas a clientes finales', leg + ch, { sub: 'La publicidad trae clientes finales: compara lo que inviertes con lo que te compran.' })}
     ${card('Mes a mes', tm, { sub: 'Toca un mes para registrar o corregir lo que Meta te cobró.', acts: addBtn('Cobro real del mes', 'pauta-real') })}
-    ${card('Campañas', tc, { sub: 'Toca una campaña para cambiar su presupuesto o ponerle fecha final si la apagas.', acts: addBtn('Campaña', 'campana') })}`;
+    ${card('Campañas', tc, { sub: 'Toca una campaña para cambiar su presupuesto o corregir los días que estuvo prendida.', acts: addBtn('Campaña', 'campana') })}`;
 };
 
 /* ---- Nómina: se gana con cada despacho (rastras × tarifa) y se paga los sábados ---- */
@@ -1758,8 +1907,7 @@ VIEW_FN.nomina = R => {
   }).join('');
 
   // Pedidos que todavía no se cargan: suman a la nómina el día que salgan.
-  const pend = [...M.porEntregar.map(p => ({ fecha: p.fecha, quien: p.cliente, rastras: p.calc.rastras, id: p.id })),
-    ...M.d.ventas.filter(v => v.canal === 'final' && v.estado === 'Pendiente').map(v => ({ fecha: v.fecha, quien: M.cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final', rastras: calcVenta(v).rastras, id: v.id }))];
+  const pend = M.porEntregar.map(p => ({ fecha: p.fecha, quien: p.cliente, rastras: p.calc.rastras, id: p.id }));
   const tarifaT = sum(M.trab, t => tarifaTrab(t, null, cfg));
   const pendNote = pend.length ? `<div class="note" style="margin-bottom:16px">Por cargar: ${pend.map(p => `<b>${esc(p.quien)}</b> ${num(p.rastras)} rastras`).join(' · ')}. Cuando los marques como entregados o despachados suman unos <b>${cop(sum(pend, p => p.rastras) * tarifaT)}</b> a la nómina.</div>` : '';
 
@@ -1938,7 +2086,7 @@ VIEW_FN.datos = () => {
   const claudeTxt = S.mode === 'gas'
     ? `Mándale a Claude por el chat fotos de remisiones o pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}. Claude deja los registros en la carpeta “Tablero Agrohermanos · entradas” de tu Drive y el tablero los carga solo la próxima vez que lo abras.`
     : `En el chat con Claude puedes mandar fotos de remisiones, pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}, o Excel con abonos. Claude los convierte en registros de este tablero y te dice qué cargó.`;
-  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos', nomina: 'Nómina (pagos y extras)' };
+  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', anticipos: 'Anticipos de clientes finales', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos', nomina: 'Nómina (pagos y extras)' };
   return `<div class="grid g-1-1">
     ${card('Dónde están tus datos', `<p style="color:var(--fg-2);margin-bottom:12px">${where}</p><div class="ledger">${counts.map(([c, k]) => `<div><span>${NOMBRES[c]}</span><b>${num(k, 0)}</b></div>`).join('')}</div>`)}
     <div class="stack">
@@ -2007,7 +2155,7 @@ function readRow(row, mode) {
     costo: row.dataset.costo ? n(row.dataset.costo) : info ? Math.round(info.costo) : 0,
     ok: !!info,
   };
-  if (mode === 'bbv') l.pbb = parseMoney(g('pbb'));
+  if (mode === 'bbv') { l.pbb = parseMoney(g('pbb')); l.plista = info ? listaPrecio(model().listaBBVenta, info.label, largo) || 0 : 0; }
   if (mode === 'dmg') { l.precio = 0; l.pbb = info ? pbbFor(info.label, largo) : 0; }
   return l;
 }
@@ -2069,7 +2217,8 @@ function liveBBV(form) {
     if (!l.ok || !l.cant) { s.textContent = l.medida && !l.ok ? 'Medida no válida: usa el formato 4x6' : ''; continue; }
     const v = l.cant * l.precio, b = l.cant * l.pbb;
     venta += v; base += b; costo += l.cant * l.costo; ras += l.cant * l.rastras; if (l.unidad !== 'rastra') pzs += l.cant;
-    s.textContent = `${num(l.rastras, 4)} rastras/pza · utilidad del punto ${cop(v - b)} · tu parte ${cop((v - b) * p)}`;
+    const dif = l.plista && l.precio ? l.precio - l.plista : 0;
+    s.textContent = `${num(l.rastras, 4)} rastras/pza${l.plista ? ` · lista ${cop(l.plista)}${Math.abs(dif) >= 1 ? ` · vendió ${cop(Math.abs(dif))} ${dif > 0 ? 'más caro' : 'más barato'}` : ''}` : ''} · utilidad del punto ${cop(v - b)} · tu parte ${cop((v - b) * p)}`;
   }
   const up = venta - base, mi = up * p;
   return { venta, base, up, mi, socio: up - mi, debe: base + mi, costo, miU: base + mi - costo, ras, pzs, p };
@@ -2083,7 +2232,7 @@ const moSnap = () => ({ aserrada: n(CFG().aserrada), arriada: n(CFG().arriada) }
 const commonNote = r => fld('f-nota', 'Nota', areaF('f-nota', r.nota, 'Opcional'), { full: true });
 
 FORMS['venta-mayorista'] = {
-  col: 'ventas', eyebrow: 'Mayoristas', title: 'Nuevo pedido de mayorista', cta: 'Guardar pedido', done: 'Pedido guardado',
+  foto: true, col: 'ventas', eyebrow: 'Mayoristas', title: 'Nuevo pedido de mayorista', cta: 'Guardar pedido', done: 'Pedido guardado',
   init: () => ({ canal: 'mayorista', fecha: todayStr(), items: [] }),
   body: r => {
     const M = model();
@@ -2112,14 +2261,14 @@ FORMS['venta-mayorista'] = {
 };
 
 FORMS['venta-final'] = {
-  col: 'ventas', eyebrow: 'Cliente final', title: 'Nuevo pedido de cliente final', cta: 'Guardar pedido', done: 'Pedido guardado',
+  foto: true, col: 'ventas', eyebrow: 'Cliente final', title: 'Nuevo pedido de cliente final', cta: 'Guardar pedido', done: 'Pedido guardado',
   init: () => ({ canal: 'final', fecha: todayStr(), estado: 'Pendiente', cliente: {}, items: [], pagos: [] }),
   body: r => {
     const c = r.cliente || {};
     const fins = model().finales.map(x => [x.id, x.empresa ? `${x.nombre} · ${x.empresa}` : x.nombre]);
     return `<div class="form-grid">
       ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
-      ${fld('f-estado', 'Estado de la entrega', selF('f-estado', r.estado || 'Pendiente', ESTADOS_FINAL))}
+      ${fld('f-estado', 'Estado de la entrega', selF('f-estado', r.estado || 'Pendiente', [['Pendiente', 'Pendiente (por entregar)'], ['Despachado', 'Despachado'], ['Entregado', 'Entregado']]), { hint: 'Pendiente no cuenta como venta ni deuda hasta que lo marques despachado. Pon en Fecha el día de entrega.' })}
       ${fins.length ? fld('f-clifinal', 'Cliente', selF('f-clifinal', r.clienteId || '', [['', 'Cliente nuevo (escribe sus datos)'], ...fins]), { full: true, hint: 'Elige un cliente guardado para llenar sus datos.' }) : ''}
       ${fld('f-nombre', 'Nombre del cliente', inp('f-nombre', c.nombre, { ph: 'Nombre y apellido' }))}
       ${fld('f-celular', 'Celular', inp('f-celular', c.celular, { ph: '300 000 0000', im: 'tel' }))}
@@ -2130,7 +2279,7 @@ FORMS['venta-final'] = {
       ${fld('f-flete', 'Domicilio cobrado', moneyF('f-flete', r.flete), { hint: 'Se suma al total' })}
       ${fld('f-costoFlete', 'Flete que pagaste', moneyF('f-costoFlete', r.costoFlete), { hint: 'Se resta de la utilidad' })}
     </div>
-    <div class="form-sec"><h4>Pagos recibidos</h4></div>
+    <div class="form-sec"><h4>Pagos recibidos</h4><span class="muted" style="font-size:11.5px">Los anticipos se cargan aparte, con su comprobante</span></div>
     <div class="pagos" id="pagos">${(r.pagos || []).map(pagoRow).join('')}</div>
     <div>${btn(`${icon('plus')}Agregar pago`, 'data-act="add-pago"', 'sm')}</div>
     <div class="form-grid">${commonNote(r)}</div><div id="live"></div>${datalistMedidas(model())}`;
@@ -2141,7 +2290,8 @@ FORMS['venta-final'] = {
     const fl = parseMoney(val(form, 'f-flete')), cf = parseMoney(val(form, 'f-costoFlete'));
     const tot = t.sub + fl, ut = tot - t.costo - cf;
     const pag = sum($$('[data-pago]', form), row => parseMoney(row.querySelector('[data-k="valor"]').value));
-    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Total del pedido', cop(tot), 1], ['Costo real', cop(t.costo + cf)], ['Utilidad', `${signed(ut)} · ${pct(tot ? ut / tot : NaN)}`], ['Pagado', cop(pag)], ['Saldo por cobrar', cop(Math.max(0, tot - pag)), 1]]);
+    const ant = S.form && !S.form.isNew ? sum(model().d.anticipos.filter(a => a.pedidoId === S.form.rec.id), a => a.valor) : 0;
+    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Total del pedido', cop(tot), 1], ['Costo real', cop(t.costo + cf)], ['Utilidad', `${signed(ut)} · ${pct(tot ? ut / tot : NaN)}`], ...(ant ? [['Anticipos cargados', cop(ant)]] : []), ['Pagado', cop(pag)], [val(form, 'f-estado') === 'Pendiente' ? 'Por cobrar al entregar' : 'Saldo por cobrar', cop(Math.max(0, tot - pag - ant)), 1]]);
   },
   read: (f, r) => ({
     ...r, mo: r.mo || moSnap(), canal: 'final', fecha: val(f, 'f-fecha'), estado: val(f, 'f-estado'), clienteId: val(f, 'f-clifinal'),
@@ -2222,14 +2372,15 @@ FORMS['cliente-final'] = {
 };
 
 const despForm = tipo => ({
-  col: 'bbDespachos', eyebrow: 'Barro Blanco', title: tipo === 'devolucion' ? 'Devolución del punto' : 'Despacho a Barro Blanco',
+  foto: true, col: 'bbDespachos', eyebrow: 'Barro Blanco', title: tipo === 'devolucion' ? 'Devolución del punto' : 'Despacho a Barro Blanco',
   cta: 'Guardar', done: tipo === 'devolucion' ? 'Devolución guardada' : 'Despacho guardado',
   init: () => ({ tipo, fecha: todayStr(), items: [] }),
   body: r => `<div class="form-grid">
       ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
       ${fld('f-remision', 'Remisión', inp('f-remision', r.remision, { ph: 'N.º de relación de despacho' }))}
     </div>
-    ${tipo === 'devolucion' ? '<div class="note">Piezas que vuelven del punto (o se dañaron). Se descuentan del inventario de Barro Blanco.</div>' : ''}
+    ${tipo === 'devolucion' ? `<div class="note">Piezas que vuelven del punto: porque se dañaron, no se vendieron o hay que cambiarlas. Salen del inventario de ${esc(CFG().punto)} y ${esc(CFG().socio)} no las paga.</div>
+    <div class="form-grid">${fld('f-motivo', '¿Por qué se devolvió?', selF('f-motivo', r.motivo || 'Pieza dañada', MOTIVOS_DEV))}${fld('f-motivo-det', 'Detalle', inp('f-motivo-det', r.motivoDetalle, { ph: 'Ej.: llegó rajada, se mojó' }))}</div>` : ''}
     ${linesBlock('sale', r.items, tipo === 'devolucion' ? 'Piezas devueltas' : 'Piezas despachadas')}
     <div class="form-grid">
       ${tipo === 'devolucion' ? '' : fld('f-costoFlete', 'Flete que pagaste', moneyF('f-costoFlete', r.costoFlete), { hint: 'Regístralo también en Gastos si quieres restarlo de la utilidad' })}
@@ -2240,14 +2391,14 @@ const despForm = tipo => ({
     const t = liveSale(form, 'sale');
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Valor a precio de sociedad', cop(t.sub), 1], ['Tu costo real', cop(t.costo)], ['Ganas en el precio de sociedad', `${signed(t.sub - t.costo)} · ${pct(t.sub ? (t.sub - t.costo) / t.sub : NaN)}`]]);
   },
-  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? {} : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'sale'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'sale'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
 });
 FORMS['bb-despacho'] = despForm('despacho');
 FORMS['bb-devolucion'] = despForm('devolucion');
 
 FORMS['bb-venta'] = {
-  col: 'bbVentas', eyebrow: 'Barro Blanco', title: 'Venta reportada por Rubén', cta: 'Guardar venta', done: 'Venta guardada',
+  foto: true, col: 'bbVentas', eyebrow: 'Barro Blanco', title: 'Venta reportada por Rubén', cta: 'Guardar venta', done: 'Venta guardada',
   init: () => ({ fecha: todayStr(), items: [], pct: n(CFG().pctSocio) }),
   body: r => `<div class="form-grid">
       ${fld('f-fecha', 'Fecha de la venta', dateF('f-fecha', r.fecha))}
@@ -2289,8 +2440,8 @@ FORMS['bb-danada'] = {
 };
 
 /* ---- Cargar con Claude: mensaje de WhatsApp o foto → formulario lleno ---- */
-const AI_KINDS = ['bb-venta', 'bb-danada', 'bb-despacho', 'bb-pago', 'venta-mayorista', 'abono', 'venta-final', 'pinera-compra', 'pinera-pago', 'gasto'];
-function aiPrompt(msg, hasImg) {
+const AI_KINDS = ['bb-venta', 'bb-devolucion', 'bb-despacho', 'bb-pago', 'venta-mayorista', 'abono', 'venta-final', 'pinera-compra', 'pinera-pago', 'gasto'];
+function aiPrompt(msg, hasImg, soloKind) {
   const M = model(), cfg = M.cfg;
   const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   const clientes = M.mayoristas.map(c => ({ id: c.id, nombre: c.nombre }));
@@ -2303,12 +2454,12 @@ function aiPrompt(msg, hasImg) {
     `${cfg.socio} es el socio que maneja el punto de venta ${cfg.punto}.`,
     'Tipos de registro:',
     `- "bb-venta": ${cfg.socio} reporta piezas vendidas en ${cfg.punto}. Campos: fecha, items [{medida, largo, cant, precio}] (precio = a cuánto vendió cada pieza).`,
-    `- "bb-danada": piezas dañadas en ${cfg.punto}. Campos: fecha, items [{medida, largo, cant}].`,
+    `- "bb-devolucion": piezas que vuelven de ${cfg.punto} o se dañaron allá. Campos: fecha, motivo (uno de ${MOTIVOS_DEV.join(', ')}), items [{medida, largo, cant}].`,
     `- "bb-despacho": madera que Agrohermanos envía a ${cfg.punto}. Campos: fecha, remision, items [{medida, largo, cant}].`,
     `- "bb-pago": ${cfg.socio} le paga dinero a Agrohermanos. Campos: fecha, valor, medio.`,
     '- "venta-mayorista": pedido de un cliente mayorista. Campos: fecha, clienteId (de la lista de abajo), remision, estado ("Entregado" o "Por entregar"), items [{medida, largo, cant, precio}] (precio solo si lo dicen).',
     '- "abono": un cliente mayorista le paga a Agrohermanos. Campos: fecha, clienteId, valor, medio.',
-    '- "venta-final": pedido de un cliente final (persona, constructora o arquitecto). Campos: fecha, clienteId (si es uno de los clientes finales de abajo), cliente {nombre, celular, municipio, direccion}, items [{medida, largo, cant, precio}], flete (domicilio cobrado).',
+    '- "venta-final": pedido de un cliente final (persona, constructora o arquitecto). Campos: fecha, clienteId (si es uno de los clientes finales de abajo), cliente {nombre, celular, municipio, direccion}, estado ("Pendiente" si todavía no se entrega, "Despachado" o "Entregado"), items [{medida, largo, cant, precio}], flete (domicilio cobrado).',
     '- "pinera-compra": madera comprada a la pinera o un cargo de la pinera. Campos: fecha, concepto ("Madera", "Aserrío", "Flete" u "Otro cargo"), remision, salida, destino, rastras, valor (total).',
     '- "pinera-pago": Agrohermanos le paga a la pinera. Campos: fecha, valor, medio.',
     `- "gasto": un gasto. Campos: fecha, categoria (${GASTO_CATS.join(', ')}), descripcion, valor.`,
@@ -2317,7 +2468,8 @@ function aiPrompt(msg, hasImg) {
     `Clientes finales registrados: ${JSON.stringify(finales)}`,
     'Un mensaje puede traer varios registros. No inventes cantidades, precios ni fechas que no estén: deja vacío lo que falte y explícalo en "nota".',
     'Responde solo con JSON así: {"registros":[{"tipo":"bb-venta","fecha":"2026-10-07","items":[{"medida":"4x6","largo":4,"cant":3,"precio":120000}]}],"nota":""}',
-    hasImg ? 'La imagen adjunta es parte del mensaje (foto de una remisión, pantallazo de WhatsApp o una nota).' : '',
+    hasImg ? 'La imagen adjunta es parte del mensaje (foto de una remisión, una cotización, un pedido escrito a mano, un pantallazo de WhatsApp o una nota).' : '',
+    soloKind ? `Esta foto es para un registro de tipo "${soloKind}". Devuelve solo un registro de ese tipo con todas las piezas que aparezcan (medida, largo, cantidad y precio si está). Si ves la remisión, el cliente o la fecha, inclúyelos.` : '',
     'Mensaje:', '<<<', String(msg || '(sin texto: lee la imagen)').slice(0, 8000), '>>>',
   ].filter(Boolean).join('\n');
 }
@@ -2351,10 +2503,10 @@ function aiNormalize(out) {
     let pre;
     switch (r.tipo) {
       case 'bb-venta': pre = { ...base, items: aiItems(r.items, true) }; break;
-      case 'bb-danada': pre = { ...base, items: aiItems(r.items, false) }; break;
+      case 'bb-devolucion': pre = { ...base, motivo: oneOf(r.motivo, MOTIVOS_DEV, 'Pieza dañada'), items: aiItems(r.items, false) }; break;
       case 'bb-despacho': pre = { ...base, remision: String(r.remision || ''), items: aiItems(r.items, false) }; break;
       case 'venta-mayorista': pre = { ...base, clienteId: cliId(r.clienteId), remision: String(r.remision || ''), estado: oneOf(r.estado, ['Entregado', 'Por entregar'], 'Entregado'), items: aiItems(r.items, true) }; break;
-      case 'venta-final': { const fc = M.finales.find(c => c.id === r.clienteId); pre = { ...base, clienteId: fc ? fc.id : '', cliente: fc ? { nombre: fc.nombre || '', celular: fc.celular || '', municipio: fc.municipio || '', direccion: fc.direccion || '' } : { nombre: String(r.cliente?.nombre || ''), celular: String(r.cliente?.celular || ''), municipio: String(r.cliente?.municipio || ''), direccion: String(r.cliente?.direccion || '') }, items: aiItems(r.items, true), flete: money(r.flete) }; break; }
+      case 'venta-final': { const fc = M.finales.find(c => c.id === r.clienteId); pre = { ...base, clienteId: fc ? fc.id : '', cliente: fc ? { nombre: fc.nombre || '', celular: fc.celular || '', municipio: fc.municipio || '', direccion: fc.direccion || '' } : { nombre: String(r.cliente?.nombre || ''), celular: String(r.cliente?.celular || ''), municipio: String(r.cliente?.municipio || ''), direccion: String(r.cliente?.direccion || '') }, estado: oneOf(r.estado, ['Pendiente', 'Despachado', 'Entregado'], 'Pendiente'), items: aiItems(r.items, true), flete: money(r.flete) }; break; }
       case 'abono': pre = { ...base, clienteId: cliId(r.clienteId), valor: money(r.valor), medio: oneOf(r.medio, MEDIOS, 'Transferencia') }; break;
       case 'bb-pago': case 'pinera-pago': pre = { ...base, valor: money(r.valor), medio: oneOf(r.medio, MEDIOS, 'Transferencia') }; break;
       case 'pinera-compra': pre = { ...base, concepto: oneOf(r.concepto, PINERA_CONCEPTOS, 'Madera'), remision: String(r.remision || ''), salida: String(r.salida || ''), destino: String(r.destino || ''), rastras: parseLoose(r.rastras), valor: money(r.valor) }; break;
@@ -2377,6 +2529,34 @@ function aiErr(e) {
     case 'prompt_too_large': return 'El mensaje es muy largo. Pega una parte a la vez.';
     default: return 'No se pudo conectar con Claude. Intenta de nuevo.';
   }
+}
+/* ---- Llenar un pedido con una foto (remisión, cotización o pedido escrito) ---- */
+function fotoPedidoBlock() {
+  if (S.sample && S.sampleImg) return `<div class="foto-fill"><label class="btn sm" for="f-foto-ped">${icon('spark')}Llenar con foto</label><input id="f-foto-ped" type="file" accept="${esc((S.sampleImg.mediaTypes || ['image/jpeg', 'image/png']).join(','))}" class="sr-only"><span>Sube la foto de la remisión o del pedido: Claude saca el despiece y llena las piezas para que las revises y corrijas.</span></div><div class="note" id="foto-status" hidden></div>`;
+  if (S.mode === 'gas') return `<div class="foto-fill"><span>Para llenar este formulario con una foto, ábrelo en el tablero de Claude. Aquí se llena a mano.</span></div>`;
+  return '';
+}
+async function llenarConFoto(file) {
+  if (!S.form || !S.sample) return;
+  const kind = S.form.kind, form = $('#form'), st = $('#foto-status', form);
+  if (st) { st.hidden = false; st.textContent = 'Claude está leyendo la foto…'; }
+  const ctl = new AbortController(); S.aiCtl = ctl;
+  try {
+    const out = await S.sample.json(aiPrompt('', true, kind), { signal: ctl.signal, cache: false, images: [file] });
+    const reg = aiNormalize(out).find(r => r.kind === kind);
+    if (!reg) { if (st) st.textContent = `No encontré piezas en esa foto.${out && out.nota ? ' ' + out.nota : ''}`; return; }
+    const pre = reg.prefill;
+    // Lo que ya elegiste se queda si la foto no lo dice.
+    const cli = val(form, 'f-cliente') || val(form, 'f-clifinal');
+    if (!pre.clienteId && cli) pre.clienteId = cli;
+    for (const [k, id] of [['remision', 'f-remision'], ['estado', 'f-estado']]) if (!pre[k] && val(form, id)) pre[k] = val(form, id);
+    if (kind === 'venta-final' && !pre.cliente?.nombre && val(form, 'f-nombre')) pre.cliente = { nombre: val(form, 'f-nombre'), celular: val(form, 'f-celular'), municipio: val(form, 'f-municipio'), direccion: val(form, 'f-direccion') };
+    S.aiCtl = null;
+    const ai = { i: 1, n: 1, nota: out && typeof out.nota === 'string' ? out.nota : '' };
+    if (S.form.isNew) openForm(kind, null, pre, ai); else openForm(kind, { ...S.form.rec, ...pre }, null, ai);
+  } catch (e) {
+    if (st) st.textContent = e && e.code === 'cancelled' ? '' : aiErr(e);
+  } finally { if (S.aiCtl === ctl) S.aiCtl = null; }
 }
 FORMS['ai'] = {
   eyebrow: 'Claude', title: 'Cargar con Claude', cta: 'Leer mensaje',
@@ -2417,23 +2597,52 @@ FORMS['ai'] = {
 
 /* ---- Pauta: campañas y cobro real del mes (se guardan en la configuración) ---- */
 const guardarCampanas = cs => Store.saveConfig({ pauta: { ...(S.config.pauta || {}), campanas: cs } });
+const periodoRow = p => `<div class="pago" data-periodo><input type="date" data-k="desde" value="${esc(p.desde || '')}" aria-label="Prendida desde"><input type="date" data-k="hasta" value="${esc(p.hasta || '')}" aria-label="Prendida hasta (vacío si sigue prendida)"><button type="button" class="icon-btn" data-act="rm-row" aria-label="Quitar">${icon('x')}</button></div>`;
 FORMS['campana'] = {
   eyebrow: 'Pauta', title: 'Nueva campaña', cta: 'Guardar campaña', done: 'Campaña guardada',
-  init: () => ({ plataforma: PLATAFORMAS[0], presupuestoDiario: 30000, inicio: todayStr(), fin: '', reales: {} }),
+  init: () => ({ plataforma: PLATAFORMAS[0], presupuestoDiario: 30000, presupuestoMensual: 900000, periodos: [], reales: {} }),
   body: r => `<div class="form-grid">
       ${fld('f-nombre', 'Nombre de la campaña', inp('f-nombre', r.nombre, { ph: 'Campaña Meta · madera estructural' }), { full: true })}
-      ${fld('f-plataforma', 'Plataforma', selF('f-plataforma', r.plataforma || PLATAFORMAS[0], PLATAFORMAS))}
+      ${fld('f-plataforma', 'Plataforma', selF('f-plataforma', r.plataforma || PLATAFORMAS[0], PLATAFORMAS), { full: true })}
+      ${fld('f-mensual', 'Presupuesto mensual', moneyF('f-mensual', mensualDe(r)), { hint: 'Escribe uno y el otro se calcula (mes de 30 días)' })}
       ${fld('f-diario', 'Presupuesto diario', moneyF('f-diario', r.presupuestoDiario))}
-      ${fld('f-inicio', 'Arrancó el', dateF('f-inicio', r.inicio))}
-      ${fld('f-fin', 'Terminó el', inp('f-fin', r.fin || '', { type: 'date' }), { hint: 'Déjalo vacío si sigue activa. Si la apagas, pon la fecha.' })}
-      ${commonNote(r)}
-    </div><div id="live"></div>`,
-  live: form => { const d = parseMoney(val(form, 'f-diario')); return d ? `<div class="note">${cop(d)} diarios son unos <b>${cop(d * 30)}</b> en un mes de 30 días.</div>` : ''; },
-  read: (f, r) => ({ ...r, id: r.id || uid(), nombre: val(f, 'f-nombre'), plataforma: val(f, 'f-plataforma'), presupuestoDiario: parseMoney(val(f, 'f-diario')), inicio: val(f, 'f-inicio'), fin: val(f, 'f-fin'), nota: val(f, 'f-nota'), reales: r.reales || {} }),
-  validate: d => !d.nombre ? 'Ponle un nombre a la campaña.' : !(d.presupuestoDiario > 0) ? 'Escribe el presupuesto diario.' : !isDate(d.inicio) ? 'Pon la fecha en que arrancó.' : isDate(d.fin) && d.fin < d.inicio ? 'La fecha en que terminó no puede ser antes de la de inicio.' : '',
+    </div>
+    <div class="form-sec"><h4>Días que estuvo prendida</h4></div>
+    <div class="note">Esto lo llena solo el interruptor de Pauta. Úsalo para corregir: “desde” y “hasta”; deja “hasta” vacío si sigue prendida.</div>
+    <div class="pagos" id="periodos">${periodosDe(r).map(periodoRow).join('')}</div>
+    <div>${btn(`${icon('plus')}Agregar días`, 'data-act="add-periodo"', 'sm')}</div>
+    <div class="form-grid">${commonNote(r)}</div><div id="live"></div>`,
+  onInput: (t, f) => {
+    if (t.id === 'f-mensual') { const m = parseMoney(t.value); $('#f-diario', f).value = m ? moneyIn(Math.round(m / 30)) : ''; }
+    if (t.id === 'f-diario') { const d = parseMoney(t.value); $('#f-mensual', f).value = d ? moneyIn(d * 30) : ''; }
+  },
+  live: form => { const d = parseMoney(val(form, 'f-diario')); return d ? `<div class="note">Prendida suma <b>${cop(d)}</b> cada día, unos <b>${cop(parseMoney(val(form, 'f-mensual')) || d * 30)}</b> al mes. Apagada no suma nada.</div>` : ''; },
+  read: (f, r) => {
+    const { inicio, fin, ...resto } = r;
+    return { ...resto, id: r.id || uid(), nombre: val(f, 'f-nombre'), plataforma: val(f, 'f-plataforma'), presupuestoDiario: parseMoney(val(f, 'f-diario')), presupuestoMensual: parseMoney(val(f, 'f-mensual')),
+      periodos: $$('[data-periodo]', f).map(row => ({ desde: row.querySelector('[data-k="desde"]').value, hasta: row.querySelector('[data-k="hasta"]').value })).filter(p => isDate(p.desde)).sort((a, b) => a.desde.localeCompare(b.desde)),
+      nota: val(f, 'f-nota'), reales: r.reales || {} };
+  },
+  validate: d => !d.nombre ? 'Ponle un nombre a la campaña.' : !(d.presupuestoDiario > 0) ? 'Escribe el presupuesto mensual o diario.' : d.periodos.some(p => isDate(p.hasta) && p.hasta < p.desde) ? 'En los días prendida, “hasta” no puede ser antes de “desde”.' : '',
   save: d => guardarCampanas([...campanas(S.config).filter(c => c.id !== d.id), d]),
   remove: r => guardarCampanas(campanas(S.config).filter(c => c.id !== r.id)),
 };
+// Interruptor: prender abre días desde hoy; apagar cierra los días en ayer (hoy ya no suma).
+function pautaSwitch(id) {
+  const hoy = todayStr();
+  return guardarCampanas(campanas(S.config).map(c => {
+    if (c.id !== id) return c;
+    const { inicio, fin, ...resto } = c;
+    let ps = periodosDe(c).map(p => ({ ...p }));
+    const abierto = ps.find(p => enPeriodo(p, hoy));
+    if (abierto) { abierto.hasta = addDays(hoy, -1); ps = ps.filter(p => p.hasta >= p.desde); }
+    else {
+      const ayer = ps.find(p => p.hasta === addDays(hoy, -1));
+      if (ayer) ayer.hasta = ''; else ps.push({ desde: hoy, hasta: '' });
+    }
+    return { ...resto, periodos: ps.sort((a, b) => a.desde.localeCompare(b.desde)) };
+  }));
+}
 FORMS['pauta-real'] = {
   eyebrow: 'Pauta', title: 'Cobro real del mes', cta: 'Guardar cobro', done: 'Cobro guardado',
   init: () => ({ mes: todayStr().slice(0, 7), campanaId: (campanas()[0] || {}).id || '' }),
@@ -2515,6 +2724,134 @@ FORMS['nomina-config'] = {
   validate: d => !isDate(d.desde) ? 'Pon la fecha de arranque.' : !d.trabajadores.some(t => t.activo !== false) ? 'Agrega al menos un trabajador.' : '',
   save: d => Store.saveConfig({ nomina: d }),
 };
+
+/* ---- Fotos: comprobantes que se guardan con el registro ---- */
+// En Claude quedan como archivos del tablero; en la versión Google, en una carpeta de tu Drive.
+const fotoDe = r => r.foto ? '/_blob/' + r.foto : r.fotoUrl || '';
+const puedeGuardarFoto = () => (S.mode === 'db' && !!S.assets) || S.mode === 'gas';
+// Achica la foto (máx. 1600 px, JPEG) para que suba rápido. Si el navegador no la puede abrir, va la original.
+async function achicarFoto(file) {
+  try {
+    const img = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const b = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.85));
+    return b && b.size < file.size ? b : file;
+  } catch { return file; }
+}
+const blobB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = rej; r.readAsDataURL(b); });
+async function guardarFoto(file, nombre) {
+  const b = await achicarFoto(file);
+  if (S.mode === 'db' && S.assets) {
+    const tipo = /^image\/(jpeg|png|webp|gif)$/.test(b.type) ? undefined : { type: 'image/jpeg' };
+    const r = await S.assets.upload(b, tipo);
+    return { foto: r.id };
+  }
+  if (S.mode === 'gas') return { fotoUrl: await gasCall('guardarImagen', nombre, await blobB64(b), b.type || 'image/jpeg') };
+  return {};
+}
+const fotoField = (r, label = 'Foto del comprobante') => fld('f-foto', label, `${fotoDe(r) ? `<a class="foto-link" href="${esc(fotoDe(r))}" target="_blank" rel="noopener">Ver la foto guardada</a>` : ''}<input id="f-foto" name="f-foto" type="file" accept="image/*">`,
+  { full: true, hint: [puedeGuardarFoto() ? 'Se guarda con el registro.' : 'En este modo la foto no se guarda.', S.sample && S.sampleImg ? 'Claude la lee y llena el valor y la fecha.' : ''].filter(Boolean).join(' ') });
+
+// Claude lee un comprobante de pago y devuelve valor, fecha, medio y referencia.
+async function leerComprobante(file, form) {
+  if (!S.sample || !S.sampleImg) return;
+  const st = $('#foto-status', form);
+  if (st) { st.hidden = false; st.textContent = 'Claude está leyendo el comprobante…'; }
+  const ctl = new AbortController(); S.aiCtl = ctl;
+  try {
+    const out = await S.sample.json([
+      `Lee este comprobante de pago (transferencia, consignación o recibo) de un cliente de Agrohermanos, en Colombia. Hoy es ${todayStr()}.`,
+      `Responde solo JSON: {"valor": número en pesos sin puntos (el valor enviado, sin el 4x1000), "fecha": "AAAA-MM-DD", "medio": uno de ${JSON.stringify(MEDIOS)}, "referencia": "banco y número de comprobante", "de": "quién envía", "para": "quién recibe", "nota": "lo que no se entienda"}.`,
+      'No inventes nada: deja vacío lo que no se lea.',
+    ].join('\n'), { signal: ctl.signal, cache: false, images: [file] });
+    if (!out || typeof out !== 'object') return;
+    const set = (id, v) => { const el = $('#' + id, form); if (el && v && !el.value.trim()) el.value = v; };
+    if (moneyLoose(out.valor)) { const el = $('#f-valor', form); if (el) el.value = moneyIn(moneyLoose(out.valor)); }
+    if (isDate(out.fecha)) { const el = $('#f-fecha', form); if (el) el.value = out.fecha; }
+    if (MEDIOS.includes(out.medio)) { const el = $('#f-medio', form); if (el) el.value = out.medio; }
+    set('f-nota', [out.referencia, out.de ? `de ${out.de}` : '', out.para ? `a ${out.para}` : ''].filter(Boolean).join(' · '));
+    if (st) st.textContent = 'Listo: revisa el valor y la fecha antes de guardar.' + (out.nota ? ' ' + out.nota : '');
+    recalcForm();
+  } catch (e) {
+    if (st) st.textContent = e && e.code === 'cancelled' ? '' : aiErr(e);
+  } finally { if (S.aiCtl === ctl) S.aiCtl = null; }
+}
+
+/* ---- Anticipos de clientes finales ---- */
+const pedidosDe = cid => { const M = model(); return [...M.porEntregar.filter(p => p.canal === 'final'), ...M.entries.filter(e => e.canal === 'final')].filter(p => p.ref.clienteId === cid); };
+const pedidoOpts = (cid, actual) => [['', 'Sin pedido todavía (se aplica al más viejo)'], ...pedidosDe(cid).filter(p => p.calc.saldo > 0.5 || p.id === actual).map(p => [p.id, `${p.ref.estado === 'Pendiente' || !p.ref.estado ? 'Por entregar' : 'Despachado'} ${fmtDay(p.fecha)} · ${num(p.calc.piezas, 0)} pzs · total ${cop(p.calc.total)} · falta ${cop(Math.max(0, p.calc.saldo))}`])];
+FORMS['anticipo'] = {
+  col: 'anticipos', eyebrow: 'Cliente final', title: 'Anticipo de cliente final', cta: 'Guardar anticipo', done: 'Anticipo guardado',
+  init: () => ({ fecha: todayStr(), medio: 'Transferencia' }),
+  body: r => {
+    const fins = model().finales.map(c => [c.id, c.empresa && c.empresa !== c.nombre ? `${c.nombre} · ${c.empresa}` : c.nombre]);
+    if (!fins.length) return `<div class="note">Primero guarda al cliente en Cliente final.</div>`;
+    const cid = r.clienteId || fins[0][0];
+    const pedido = r.pedidoId ?? (pedidosDe(cid).find(p => p.ref.estado === 'Pendiente' && p.calc.saldo > 0.5)?.id || '');
+    return `<div class="form-grid">
+      ${fld('f-clifin', 'Cliente', selF('f-clifin', cid, fins), { full: true })}
+      ${fld('f-pedido', 'Pedido', selF('f-pedido', pedido, pedidoOpts(cid, r.pedidoId)), { full: true, hint: 'El anticipo se descuenta de este pedido.' })}
+      ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
+      ${fld('f-valor', 'Valor', moneyF('f-valor', r.valor))}
+      ${fld('f-medio', 'Medio', selF('f-medio', r.medio || 'Transferencia', MEDIOS))}
+      ${fotoField(r)}
+      ${commonNote(r)}
+    </div><div class="note" id="foto-status" hidden></div><div id="live"></div>`;
+  },
+  onChange: (t, f) => {
+    if (t.id === 'f-clifin') $('#f-pedido', f).innerHTML = pedidoOpts(t.value).map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('');
+    if (t.id === 'f-foto' && t.files && t.files[0]) leerComprobante(t.files[0], f);
+  },
+  live: form => {
+    const p = pedidosDe(val(form, 'f-clifin')).find(x => x.id === val(form, 'f-pedido')), v = parseMoney(val(form, 'f-valor'));
+    if (!p) return '';
+    const yaEste = S.form && !S.form.isNew && S.form.rec.pedidoId === p.id ? n(S.form.rec.valor) : 0;
+    const falta = p.calc.saldo + yaEste - v;
+    return `<div class="note">Pedido por ${cop(p.calc.total)}. Con este anticipo ${falta > 0.5 ? `faltan <b>${cop(falta)}</b>${p.ref.estado === 'Pendiente' ? ' para cobrar al entregar' : ''}` : falta < -0.5 ? `queda <b>${cop(-falta)}</b> de más` : 'queda <b>pagado</b>'}${p.calc.total ? ` · el anticipo es el ${pct((p.calc.total - falta) / p.calc.total)} del pedido` : ''}.</div>`;
+  },
+  read: (f, r) => ({ ...r, clienteId: val(f, 'f-clifin'), pedidoId: val(f, 'f-pedido'), fecha: val(f, 'f-fecha'), valor: parseMoney(val(f, 'f-valor')), medio: val(f, 'f-medio'), nota: val(f, 'f-nota'), _foto: f.querySelector('#f-foto')?.files?.[0] || null }),
+  validate: d => !d.clienteId ? 'Elige el cliente.' : !isDate(d.fecha) ? 'Pon la fecha.' : !(d.valor > 0) ? 'Escribe el valor del anticipo.' : '',
+  save: async d => {
+    const { _foto, ...rec } = d;
+    if (_foto && puedeGuardarFoto()) {
+      try { Object.assign(rec, await guardarFoto(_foto, `anticipo-${rec.fecha}-${(model().cli.get(rec.clienteId)?.nombre || 'cliente').replace(/[^\wÀ-ÿ]+/g, '-')}.jpg`)); }
+      catch (e) { toast('El anticipo se guardó, pero la foto no se pudo subir.'); }
+    }
+    await Store.save('anticipos', rec);
+  },
+};
+
+/* ---- Menú de tres puntos de cada cliente final ---- */
+function cliMenu(btnEl) {
+  cerrarPop();
+  const c = model().cli.get(btnEl.dataset.id); if (!c) return;
+  const r = btnEl.getBoundingClientRect();
+  const m = document.createElement('div');
+  m.className = 'menu pop'; m.id = 'pop'; m.setAttribute('role', 'menu');
+  m.innerHTML = `<h4>${esc(c.nombre)}</h4>
+    <button type="button" role="menuitem" data-act="form" data-form="venta-final" data-cli="${esc(c.id)}"><i></i>Nuevo pedido</button>
+    <button type="button" role="menuitem" data-act="form" data-form="anticipo" data-cli="${esc(c.id)}"><i style="background:var(--brand)"></i>Cargar anticipo</button>
+    <button type="button" role="menuitem" data-act="edit" data-col="clientes" data-id="${esc(c.id)}"><i></i>Editar cliente</button>`;
+  document.body.appendChild(m);
+  const w = m.offsetWidth;
+  m.style.top = `${Math.min(window.innerHeight - m.offsetHeight - 8, r.bottom + 6)}px`;
+  m.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
+  m.querySelector('button').focus();
+}
+function cerrarPop() { const p = $('#pop'); if (p) p.remove(); }
+// Lo que trae un botón para llenar el formulario (cliente o pedido).
+function prefillDe(ds, kind) {
+  const out = {};
+  if (ds.cli) {
+    out.clienteId = ds.cli;
+    const c = model().cli.get(ds.cli);
+    if (kind === 'venta-final' && c) out.cliente = { nombre: c.nombre || '', celular: c.celular || '', municipio: c.municipio || '', direccion: c.direccion || '' };
+  }
+  if (ds.pedido) out.pedidoId = ds.pedido;
+  return out;
+}
 
 FORMS['pinera-compra'] = {
   col: 'pineraCompras', eyebrow: 'La Pinera', title: 'Compra o cargo de la pinera', cta: 'Guardar', done: 'Movimiento guardado',
@@ -2639,7 +2976,7 @@ FORMS['costos'] = {
 };
 
 const EDIT_KIND = {
-  ventas: r => r.canal === 'final' ? 'venta-final' : 'venta-mayorista', abonos: () => 'abono', clientes: r => r.tipo === 'final' ? 'cliente-final' : 'cliente',
+  ventas: r => r.canal === 'final' ? 'venta-final' : 'venta-mayorista', abonos: () => 'abono', anticipos: () => 'anticipo', clientes: r => r.tipo === 'final' ? 'cliente-final' : 'cliente',
   bbDespachos: r => r.tipo === 'devolucion' ? 'bb-devolucion' : 'bb-despacho', bbVentas: r => r.danada ? 'bb-danada' : 'bb-venta', bbPagos: () => 'bb-pago',
   pineraCompras: () => 'pinera-compra', pineraPagos: () => 'pinera-pago', gastos: () => 'gasto', listas: () => 'lista',
   nomina: r => r.tipo === 'cargo' ? 'nomina-cargo' : 'nomina-pago',
@@ -2653,7 +2990,7 @@ function openForm(kind, rec, prefill, ai) {
   const base = F.title.replace(/^Nuev[oa] /, '');
   const title = rec ? `Editar ${base.charAt(0).toLowerCase()}${base.slice(1)}` : F.title;
   $('#form').innerHTML = `<header><div><div class="eyebrow">${F.eyebrow}${S.demo ? ' · ejemplo' : ''}</div><h2>${esc(title)}</h2></div><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">${icon('x')}</button></header>
-    <div class="panel-b"><div class="form-err" id="form-err" hidden></div>${ai ? `<div class="note"><b>Claude llenó este formulario${ai.n > 1 ? ` (${ai.i} de ${ai.n})` : ''}.</b> Revisa los datos y guarda.${ai.nota ? ' ' + esc(ai.nota) : ''}</div>` : ''}${F.body(r)}</div>
+    <div class="panel-b"><div class="form-err" id="form-err" hidden></div>${ai ? `<div class="note"><b>Claude llenó este formulario${ai.n > 1 ? ` (${ai.i} de ${ai.n})` : ''}.</b> Revisa los datos y guarda.${ai.nota ? ' ' + esc(ai.nota) : ''}</div>` : ''}${F.foto ? fotoPedidoBlock() : ''}${F.body(r)}</div>
     <footer>${rec && (F.col || F.remove) ? '<button type="button" class="btn danger" data-act="del">Eliminar</button>' : ''}<span class="sp"></span><button type="button" class="btn ghost" data-act="close">Cancelar</button><button type="submit" class="btn primary" id="f-submit">${rec ? 'Guardar cambios' : (F.cta || 'Guardar')}</button></footer>`;
   $('#drawer').hidden = false;
   document.body.style.overflow = 'hidden';
@@ -2847,7 +3184,9 @@ function buildDemo() {
     if (ras) for (const [id, k] of [['demo-t1', 'aserrada'], ['demo-t2', 'arriada']]) nomina.push({ id: 'dn' + (i++), tipo: 'pago', trabajadorId: id, fecha: s, valor: Math.round(ras * DEFAULT_CONFIG[k] / 1000) * 1000, medio: 'Efectivo' });
   }
   nomina.push({ id: 'dn-x', tipo: 'cargo', trabajadorId: 'demo-t2', fecha: addDays(hoy, -9), concepto: 'Día de cargue (ejemplo)', valor: 60000 });
-  return { listas, clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina };
+  const fpe = ventas.filter(v => v.canal === 'final' && (v.estado || 'Pendiente') === 'Pendiente')[0];
+  const anticipos = fpe ? [{ id: 'dant1', clienteId: '', pedidoId: fpe.id, fecha: fpe.fecha, valor: Math.round(sum(fpe.items, l => l.cant * l.precio) * 0.3 / 100) * 100, medio: 'Transferencia', nota: 'Anticipo del 30% (ejemplo)' }] : [];
+  return { listas, clientes, ventas, abonos, anticipos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina };
 }
 
 /* =========================================================================
@@ -2865,6 +3204,8 @@ function toggleMenu(force) {
 }
 
 document.addEventListener('click', e => {
+  if (e.target.closest('a[href]')) return;
+  if ($('#pop') && !e.target.closest('#pop') && !e.target.closest('[data-act="cli-menu"]')) cerrarPop();
   const t = e.target.closest('[data-act]');
   if (!$('#menu').hidden && !e.target.closest('#menu') && !(t && t.dataset.act === 'menu')) toggleMenu(false);
   if (!t) return;
@@ -2873,7 +3214,8 @@ document.addEventListener('click', e => {
     case 'nav': S.view = t.dataset.v; pref.set('view', S.view); render(); window.scrollTo(0, 0); break;
     case 'range': S.range = t.dataset.r; pref.set('range', S.range); render(); break;
     case 'menu': toggleMenu(); break;
-    case 'form': toggleMenu(false); openForm(t.dataset.form); break;
+    case 'form': toggleMenu(false); cerrarPop(); openForm(t.dataset.form, null, prefillDe(t.dataset, t.dataset.form)); break;
+    case 'cli-menu': cliMenu(t); break;
     case 'edit': openEdit(t.dataset.col, t.dataset.id); break;
     case 'close': closeForm(); break;
     case 'add-line': {
@@ -2888,8 +3230,16 @@ document.addEventListener('click', e => {
     }
     case 'add-pago': $('#pagos').insertAdjacentHTML('beforeend', pagoRow({})); recalcForm(); break;
     case 'add-tramo': $('#tramos').insertAdjacentHTML('beforeend', tramoRow({})); break;
-    case 'rm-row': t.closest('[data-pago],[data-tramo],[data-trab]').remove(); recalcForm(); break;
+    case 'rm-row': t.closest('[data-pago],[data-tramo],[data-trab],[data-periodo]').remove(); recalcForm(); break;
     case 'add-trab': $('#trabs').insertAdjacentHTML('beforeend', trabRow({})); break;
+    case 'add-periodo': $('#periodos').insertAdjacentHTML('beforeend', periodoRow({ desde: todayStr(), hasta: '' })); break;
+    case 'pauta-switch': {
+      if (S.demo) { toast('Estás viendo el ejemplo. Sal del ejemplo para cambiar la pauta.'); break; }
+      const on = t.getAttribute('aria-checked') === 'true';
+      t.disabled = true;
+      pautaSwitch(t.dataset.id).then(() => toast(on ? 'Pauta apagada: desde hoy no suma' : 'Pauta prendida: desde hoy suma su presupuesto diario'), err => { toast(errMsg(err)); t.disabled = false; });
+      break;
+    }
     case 'nomina-pagar': { const s1 = model().nominaSaldo.get(t.dataset.id) || 0; openForm('nomina-pago', null, { trabajadorId: t.dataset.id, valor: Math.max(0, Math.round(s1)) }); break; }
     case 'del': armDelete(t); break;
     case 'demo': S.demo = !S.demo; closeForm(); bump(); break;
@@ -2907,8 +3257,8 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (!$('#drawer').hidden) closeForm(); else toggleMenu(false); }
-  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-act]')) e.target.click();
+  if (e.key === 'Escape') { if ($('#pop')) cerrarPop(); else if (!$('#drawer').hidden) closeForm(); else toggleMenu(false); }
+  if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-act], [role="button"][data-act]')) e.target.click();
 });
 document.addEventListener('input', e => {
   const t = e.target;
@@ -2929,6 +3279,8 @@ document.addEventListener('input', e => {
     if (k === 'medida' || k === 'largo') { delete row.dataset.costo; delete row.dataset.rastras; autoPrice($('#form'), row); }
     if (k === 'precio' || k === 'pbb') t.dataset.auto = t.value.trim() ? '0' : '1';
   }
+  const F = FORMS[S.form.kind];
+  if (F && F.onInput) F.onInput(t, $('#form'));
   recalcForm();
 });
 document.addEventListener('change', e => {
@@ -2939,6 +3291,8 @@ document.addEventListener('change', e => {
     if (c) for (const [id, k] of [['f-nombre', 'nombre'], ['f-celular', 'celular'], ['f-municipio', 'municipio'], ['f-direccion', 'direccion']]) { const el = $('#' + id); if (el) el.value = c[k] || ''; }
   }
   if (S.form && t.id === 'f-cliente') { for (const row of $$('[data-line]', $('#form'))) autoPrice($('#form'), row); recalcForm(); }
+  if (S.form && t.id === 'f-foto-ped' && t.files && t.files[0]) { llenarConFoto(t.files[0]); t.value = ''; return; }
+  if (S.form && t.closest('#form')) { const F = FORMS[S.form.kind]; if (F && F.onChange) F.onChange(t, $('#form')); }
   if (S.form) recalcForm();
 });
 document.addEventListener('focusout', e => {
@@ -2972,6 +3326,12 @@ window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw
       try { const lim = await sm.limits(); S.sampleImg = lim && lim.images ? lim.images : null; } catch { S.sampleImg = null; }
       render();
     } catch { /* sin Claude: se oculta la función */ }
+  })();
+  (async () => {
+    try {
+      const as = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('assets') : null;
+      if (as) S.assets = as;
+    } catch { /* sin permiso para guardar fotos: se registra sin foto */ }
   })();
 })();
 
