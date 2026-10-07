@@ -174,6 +174,21 @@ function prepararLibro_(libro) {
   h.setColumnWidth(1, 720);
 }
 
+// Lista definida como tarifa por rastra según el largo: precio = tarifa × (ancho × grueso × largo ÷ 240).
+// tarifa: {"300": 196730, ...} con el largo en centímetros; medidas: ["4x6", ...].
+function expandirTarifa_(tarifa, medidas) {
+  const precios = {};
+  medidas.forEach(function (m) {
+    const p = String(m).split('x').map(Number);
+    if (!(p[0] > 0 && p[1] > 0)) return;
+    precios[m] = {};
+    Object.keys(tarifa).forEach(function (cm) {
+      precios[m][cm] = Math.round(Number(tarifa[cm]) * (p[0] * p[1] * (Number(cm) / 100) / 240));
+    });
+  });
+  return precios;
+}
+
 // Registros que Claude deja como archivos JSON en la carpeta de entradas.
 // Formato: {"ventas":[{...,"id":"..."}], "abonos":[...], "config":{...}}
 function importarEntradas_(libro) {
@@ -196,6 +211,7 @@ function importarEntradas_(libro) {
           const resumen = copia._resumen || '';
           delete copia.id;
           delete copia._resumen;
+          if (c === 'listas' && copia.tarifa && Array.isArray(copia.medidas) && !copia.precios) copia.precios = expandirTarifa_(copia.tarifa, copia.medidas);
           escribir_(hoja_(libro, c), String(rec.id), JSON.stringify(copia), resumen);
           total++;
         });
