@@ -19,6 +19,14 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 | Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
 
+## Versión Google (un link propio)
+
+La carpeta `google/` tiene la versión que se abre como un link normal de Google:
+
+- `google/Codigo.gs`: el servidor en Google Apps Script. Se pega en *Extensiones → Apps Script* de la hoja “Tablero Agrohermanos · datos” y se publica como aplicación web (Ejecutar como: yo · Acceso: solo yo).
+- `google/tablero-agrohermanos.html`: la página. El servidor la descarga de este repositorio cada vez que se abre, así que cada cambio que se sube aquí aparece solo en el link.
+- Los datos quedan en la hoja de Google Sheets: una pestaña por tipo de registro. Claude puede dejar registros nuevos como archivos JSON en la carpeta “Tablero Agrohermanos · entradas” de Drive y el tablero los carga al abrirse.
+
 ## Cargar con Claude
 
 Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp, una nota o una foto de una remisión. Claude lo convierte en registros y abre cada formulario ya lleno para revisarlo antes de guardar. Usa el `sample` de la página, que gasta del uso de Claude de quien lo abre.
@@ -26,7 +34,7 @@ Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp,
 ## Fórmulas
 
 - **Rastras de una pieza** = ancho (pulg.) × grueso (pulg.) × largo (m) ÷ 240.
-- **Costo real por rastra** = precio de la pinera según el largo (tabla 2026) + aserrada $58.000 + arriada $6.000.
+- **Costo real por rastra** = precio de la pinera según el largo + mano de obra (aserrada + arriada). Los valores reales se guardan en la configuración del tablero, no en el código.
 - **Costo real de una pieza** = rastras × costo real por rastra. Se guarda en cada venta, así que cambiar los costos no altera el historial.
 - **Barro Blanco**: utilidad del punto = venta − precio de sociedad. Tu parte = 50% de esa utilidad. Rubén te liquida el precio de sociedad + tu parte. Tu utilidad real = lo que te liquida − tu costo real.
 - **Utilidad neta** del período = Σ(venta − costo real) − gastos del período.

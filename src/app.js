@@ -76,15 +76,15 @@ const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="non
    Modelo de datos
    ========================================================================= */
 const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos'];
-// Costo de la pinera por rastra según el largo (tabla 2026) + mano de obra por rastra.
-const PINERA_2026 = [
-  [1.4, 125730], [3.4, 125730], [3.9, 132715], [4.4, 144780], [4.9, 159258], [5.4, 176784], [5.9, 184912],
-  [6.4, 199136], [6.9, 210000], [7.4, 228600], [7.9, 241808], [8.4, 285750], [8.9, 301625], [9.4, 317500],
-  [9.9, 333375], [10.4, 345875], [10.9, 358375], [11.4, 370875], [11.9, 383375], [12.5, 395875],
+// Tabla de EJEMPLO (precio de la pinera por rastra según el largo). Los costos reales no van en el código:
+// se guardan en la configuración del tablero (Precios y costos → Editar costos).
+const PINERA_EJEMPLO = [
+  [3.4, 120000], [3.9, 130000], [4.4, 140000], [4.9, 155000], [5.9, 175000], [6.9, 200000],
+  [7.9, 230000], [8.9, 280000], [9.9, 320000], [10.9, 350000], [12.5, 380000],
 ].map(([hasta, valor]) => ({ hasta, valor }));
 const DEFAULT_CONFIG = {
   socio: 'Rubén', punto: 'Barro Blanco', pctSocio: 50, diasCredito: 30, stockMin: 3,
-  pinera: PINERA_2026, aserrada: 58000, arriada: 6000, listaBB: '', listaBBVenta: '', listaFinal: '',
+  pinera: PINERA_EJEMPLO, aserrada: 50000, arriada: 5000, listaBB: '', listaBBVenta: '', listaFinal: '',
 };
 const MEDIOS = ['Transferencia', 'Efectivo', 'Consignación', 'Otro'];
 const GASTO_CATS = ['Flete', 'Cargue', 'Combustible', 'Aserrío', 'Arriería', 'Inmunización', 'Herramientas', 'Comisiones', 'Otro'];
@@ -140,9 +140,54 @@ const CFG = () => (S.demo ? { ...DEFAULT_CONFIG, listaBBVenta: 'demo-l4' } : S.c
    Almacenamiento: base de datos de Claude (db) o, si no existe, este navegador
    ========================================================================= */
 const LOCAL_KEY = 'agh.data.v1';
+// Versión Google: la página la sirve Google Apps Script y los datos viven en una hoja de Google Sheets.
+const GAS = () => typeof google !== 'undefined' && google.script && google.script.run;
+function gasCall(fn, ...args) {
+  return new Promise((res, rej) => {
+    google.script.run
+      .withSuccessHandler(res)
+      .withFailureHandler(e => rej({ code: 'gas', message: (e && e.message) || String(e) }))[fn](...args);
+  });
+}
+function resumenDe(col, r) {
+  try {
+    switch (col) {
+      case 'ventas': { const c = calcVenta(r); const quien = r.canal === 'final' ? (r.cliente?.nombre || 'Cliente final') : (S.data.clientes.find(x => x.id === r.clienteId)?.nombre || 'Mayorista'); return `${r.canal === 'final' ? 'Cliente final' : 'Mayorista'} · ${quien} · ${num(c.piezas, 0)} pzs · ${cop(c.total)}${r.estado ? ' · ' + r.estado : ''}`; }
+      case 'bbVentas': { const c = calcBB(r, S.config.pctSocio); return `${r.danada ? 'Piezas dañadas' : 'Venta en el punto'} ${cop(c.venta)} · te liquida ${cop(c.debe)}`; }
+      case 'bbDespachos': { const c = calcVenta(r); return `${r.tipo === 'devolucion' ? 'Devolución' : 'Despacho'} · ${num(c.piezas, 0)} pzs · ${cop(c.sub)} a precio de sociedad`; }
+      case 'pineraCompras': return `${r.concepto || 'Madera'}${n(r.rastras) ? ' · ' + num(r.rastras, 4) + ' rastras' : ''} · ${cop(r.valor)}`;
+      case 'gastos': return `${r.categoria || 'Gasto'} · ${r.descripcion || ''} · ${cop(r.valor)}`;
+      case 'listas': return `${r.nombre} · ${Object.keys(r.precios || {}).length} medidas`;
+      case 'clientes': return `${r.nombre} · ${r.tipo === 'final' ? 'cliente final' : 'mayorista'}`;
+      default: return `${cop(r.valor)}${r.medio ? ' · ' + r.medio : ''}`;
+    }
+  } catch { return ''; }
+}
 const Store = {
   db: null,
+  async gasLoad(quiet) {
+    try {
+      const j = JSON.parse(await gasCall('cargarTodo'));
+      for (const c of COLS) S.data[c] = Array.isArray(j[c]) ? j[c] : [];
+      S.config = { ...DEFAULT_CONFIG, ...(j.config || {}) };
+      S.sheetUrl = j.sheetUrl || '';
+      COLS.forEach(c => S.loaded.add(c)); S.loaded.add('config');
+      if (j.importados) toast(`Claude cargó ${j.importados} ${j.importados === 1 ? 'registro nuevo' : 'registros nuevos'}`);
+      bump();
+    } catch (e) {
+      if (!quiet) toast('No se pudieron leer los datos de Google Sheets. Recarga la página.');
+    }
+  },
   async init() {
+    if (GAS()) {
+      S.mode = 'gas';
+      await this.gasLoad();
+      // Trae cambios hechos desde otro dispositivo.
+      const refresh = () => { if (!document.hidden && !S.form) this.gasLoad(true); };
+      setInterval(refresh, 120000);
+      document.addEventListener('visibilitychange', refresh);
+      return;
+    }
     let db = null;
     try {
       if (window.claude && typeof window.claude.use === 'function') db = await window.claude.use('db');
@@ -194,7 +239,12 @@ const Store = {
     body.actualizado = new Date().toISOString();
     if (!body.creado) body.creado = body.actualizado;
     if (this.db) { await this.retry(() => this.db.collection(col).doc(id).set(body)); }
-    else {
+    else if (S.mode === 'gas') {
+      await gasCall('guardar', col, id, JSON.stringify(body), resumenDe(col, body));
+      const arr = S.data[col]; const i = arr.findIndex(x => x.id === id);
+      if (i >= 0) arr[i] = { ...body, id }; else arr.push({ ...body, id });
+      bump();
+    } else {
       const arr = S.data[col]; const i = arr.findIndex(x => x.id === id);
       if (i >= 0) arr[i] = { ...body, id }; else arr.push({ ...body, id });
       this.saveLocal(); bump();
@@ -203,11 +253,13 @@ const Store = {
   },
   async remove(col, id) {
     if (this.db) await this.retry(() => this.db.collection(col).doc(id).delete());
+    else if (S.mode === 'gas') { await gasCall('borrar', col, id); S.data[col] = S.data[col].filter(x => x.id !== id); bump(); }
     else { S.data[col] = S.data[col].filter(x => x.id !== id); this.saveLocal(); bump(); }
   },
   async saveConfig(cfg) {
     const body = { ...S.config, ...cfg };
     if (this.db) await this.retry(() => this.db.doc('config/general').set(body));
+    else if (S.mode === 'gas') { await gasCall('guardarConfig', JSON.stringify(body)); S.config = body; bump(); }
     else { S.config = body; this.saveLocal(); bump(); }
   },
 };
@@ -236,7 +288,7 @@ function parseMedida(txt) {
 const largoKey = L => String(Math.round(n(L) * 100));
 const rastrasPieza = (a, b, L) => a * b * L / 240;
 function pineraRate(L, cfg = CFG()) {
-  const t = (Array.isArray(cfg.pinera) && cfg.pinera.length ? cfg.pinera : PINERA_2026).slice().sort((x, y) => n(x.hasta) - n(y.hasta));
+  const t = (Array.isArray(cfg.pinera) && cfg.pinera.length ? cfg.pinera : PINERA_EJEMPLO).slice().sort((x, y) => n(x.hasta) - n(y.hasta));
   for (const r of t) if (L <= n(r.hasta) + 0.049) return n(r.valor);
   return n(t[t.length - 1] && t[t.length - 1].valor);
 }
@@ -624,7 +676,7 @@ function renderNav() {
     html += `<button type="button" data-act="nav" data-v="${v.id}" ${S.view === v.id ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${v.label}</span>${badge}</button>`;
   }
   $('#nav').innerHTML = html;
-  const st = S.mode === 'db' ? ['on', 'Sincronizado'] : S.mode === 'local' ? ['local', 'Solo este navegador'] : ['', 'Conectando…'];
+  const st = S.mode === 'db' ? ['on', 'Sincronizado'] : S.mode === 'gas' ? ['on', 'Guardado en Google'] : S.mode === 'local' ? ['local', 'Solo este navegador'] : ['', 'Conectando…'];
   $('#rail-foot').innerHTML = `<div class="sync ${st[0]}"><i></i>${st[1]}</div>
     <button type="button" class="btn ghost sm" data-act="demo" style="justify-content:flex-start;padding-left:0">${S.demo ? 'Salir del ejemplo' : 'Ver con datos de ejemplo'}</button>`;
 }
@@ -1070,7 +1122,7 @@ VIEW_FN.compras = R => {
 
 // Tabla de costo por rastra según el largo (pinera + mano de obra).
 function costoRastraTable(cfg) {
-  const t = (Array.isArray(cfg.pinera) && cfg.pinera.length ? cfg.pinera : PINERA_2026).slice().sort((a, b) => a.hasta - b.hasta);
+  const t = (Array.isArray(cfg.pinera) && cfg.pinera.length ? cfg.pinera : PINERA_EJEMPLO).slice().sort((a, b) => a.hasta - b.hasta);
   const mo = manoObra(cfg);
   let desde = 0;
   const rows = t.map(r => { const o = { desde, hasta: n(r.hasta), valor: n(r.valor) }; desde = +(n(r.hasta) + 0.1).toFixed(1); return o; });
@@ -1204,16 +1256,22 @@ VIEW_FN.datos = () => {
   const counts = COLS.map(c => [c, S.data[c].length]);
   const where = S.mode === 'db'
     ? 'Tus datos viven en la base de datos privada de este tablero en Claude. Los ves desde cualquier computador o celular entrando con tu cuenta, y Claude también puede leerlos y cargarlos por ti.'
-    : 'Abriste el archivo fuera de Claude. Lo que registres se guarda solo en este navegador; exporta una copia para no perderla.';
+    : S.mode === 'gas'
+      ? `Tus datos están en la hoja de Google Sheets “Tablero Agrohermanos · datos” de tu Drive. La puedes abrir para revisarla, pero registra y edita desde el tablero.${S.sheetUrl ? ` <a href="${esc(S.sheetUrl)}" target="_blank" rel="noopener">Abrir la hoja</a>` : ''}`
+      : 'Abriste el archivo fuera de Claude. Lo que registres se guarda solo en este navegador; exporta una copia para no perderla.';
+  const exportNote = S.lastExport ? `<div class="note" style="margin-top:10px">Copia guardada en tu Drive: <a href="${esc(S.lastExport.url)}" target="_blank" rel="noopener">${esc(S.lastExport.filename)}</a></div>` : '';
+  const claudeTxt = S.mode === 'gas'
+    ? `Mándale a Claude por el chat fotos de remisiones o pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}. Claude deja los registros en la carpeta “Tablero Agrohermanos · entradas” de tu Drive y el tablero los carga solo la próxima vez que lo abras.`
+    : `En el chat con Claude puedes mandar fotos de remisiones, pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}, o Excel con abonos. Claude los convierte en registros de este tablero y te dice qué cargó.`;
   const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos' };
   return `<div class="grid g-1-1">
     ${card('Dónde están tus datos', `<p style="color:var(--fg-2);margin-bottom:12px">${where}</p><div class="ledger">${counts.map(([c, k]) => `<div><span>${NOMBRES[c]}</span><b>${num(k, 0)}</b></div>`).join('')}</div>`)}
     <div class="stack">
-      ${card('Copia de seguridad', `<p style="color:var(--fg-2);margin-bottom:12px">Descarga todo en un archivo para guardarlo o abrirlo en Excel.</p>
-        <div class="pills">${btn(`${icon('down')}Todo (JSON)`, 'data-act="export-json"', '')}${btn(`${icon('down')}Ventas en Excel (CSV)`, 'data-act="export-csv"', '')}</div>`)}
+      ${card('Copia de seguridad', `<p style="color:var(--fg-2);margin-bottom:12px">${S.mode === 'gas' ? 'Guarda una copia de todo en tu Drive, o las ventas en un archivo para abrir en Excel.' : 'Descarga todo en un archivo para guardarlo o abrirlo en Excel.'}</p>
+        <div class="pills">${btn(`${icon('down')}Todo (JSON)`, 'data-act="export-json"', '')}${btn(`${icon('down')}Ventas en Excel (CSV)`, 'data-act="export-csv"', '')}</div>${exportNote}`)}
       ${card('Restaurar una copia', `<p style="color:var(--fg-2);margin-bottom:12px">Carga un archivo JSON exportado desde este tablero. Los registros con el mismo identificador se reemplazan; los demás se agregan.</p>
         <div id="import-zone">${btn(`${icon('up')}Elegir archivo`, 'data-act="import"', '')}</div>`)}
-      ${card('Cargar información con Claude', `<p style="color:var(--fg-2)">En el chat con Claude puedes mandar fotos de remisiones, pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}, o Excel con abonos. Claude los convierte en registros de este tablero y te dice qué cargó.</p>`)}
+      ${card('Cargar información con Claude', `<p style="color:var(--fg-2)">${claudeTxt}</p>`)}
     </div></div>`;
 };
 
@@ -1784,7 +1842,7 @@ FORMS['costos'] = {
     </div>
     <div class="form-sec"><h4>Precio de la pinera por rastra según el largo</h4></div>
     <div class="note">Cada tramo va desde el largo del tramo anterior hasta el largo que escribas.</div>
-    <div class="pagos" id="tramos">${(Array.isArray(r.pinera) && r.pinera.length ? r.pinera : PINERA_2026).slice().sort((a, b) => a.hasta - b.hasta).map(tramoRow).join('')}</div>
+    <div class="pagos" id="tramos">${(Array.isArray(r.pinera) && r.pinera.length ? r.pinera : PINERA_EJEMPLO).slice().sort((a, b) => a.hasta - b.hasta).map(tramoRow).join('')}</div>
     <div>${btn(`${icon('plus')}Agregar tramo`, 'data-act="add-tramo"', 'sm')}</div>`,
   read: f => ({ aserrada: parseMoney(val(f, 'f-aserrada')), arriada: parseMoney(val(f, 'f-arriada')), pinera: $$('[data-tramo]', f).map(row => ({ hasta: parseQty(row.querySelector('[data-k="hasta"]').value), valor: parseMoney(row.querySelector('[data-k="valor"]').value) })).filter(t => t.hasta > 0 && t.valor > 0).sort((a, b) => a.hasta - b.hasta) }),
   validate: d => !d.pinera.length ? 'Deja al menos un tramo de largo con su precio.' : '',
@@ -1870,6 +1928,11 @@ async function armDelete(b) {
    Exportar e importar
    ========================================================================= */
 async function saveFile(filename, text) {
+  if (S.mode === 'gas') {
+    try { S.lastExport = { filename, url: await gasCall('guardarArchivo', filename, text) }; toast('Copia guardada en tu Drive'); render(); }
+    catch { toast('No se pudo guardar la copia en tu Drive.'); }
+    return;
+  }
   let dl = null;
   try { dl = window.claude && typeof window.claude.use === 'function' ? await window.claude.use('downloads') : null; } catch { dl = null; }
   if (dl) {
