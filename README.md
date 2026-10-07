@@ -16,6 +16,8 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 | Barro Blanco | Despachos, ventas reportadas por Rubén, pagos, piezas dañadas (las asume la sociedad), inventario en el punto y liquidación 50/50. |
 | Cliente final | Directorio de clientes finales (personas, constructoras, arquitectos) y sus pedidos con dirección, pagos y saldo. |
 | Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
+| Pauta | Gasto en publicidad de Meta por campaña: presupuesto diario o cobro real del mes. Se suma a los gastos del período. |
+| Nómina | Lo que se le debe a cada trabajador. Cada despacho suma sus rastras × la tarifa de aserrada o arriada; los pagos (normalmente los sábados) lo bajan. |
 | Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
 
@@ -37,7 +39,9 @@ Dentro de Claude, el botón **Cargar con Claude** recibe un mensaje de WhatsApp,
 - **Costo real por rastra** = precio de la pinera según el largo + mano de obra (aserrada + arriada). Los valores reales se guardan en la configuración del tablero, no en el código.
 - **Costo real de una pieza** = rastras × costo real por rastra. Se guarda en cada venta, así que cambiar los costos no altera el historial.
 - **Barro Blanco**: utilidad del punto = venta − precio de sociedad. Tu parte = 50% de esa utilidad. Rubén te liquida el precio de sociedad + tu parte. Tu utilidad real = lo que te liquida − tu costo real.
-- **Utilidad neta** del período = Σ(venta − costo real) − gastos del período.
+- **Utilidad neta** del período = Σ(venta − costo real) − gastos del período (gastos registrados + pauta + trabajos extra de nómina).
+- **Nómina**: cada despacho desde la fecha de arranque suma rastras × tarifa a cada trabajador. Esa plata ya está dentro del costo real, así que no se resta otra vez; solo los trabajos extra cuentan como gasto.
+- **Abono pagado a un tercero**: si un mayorista le paga directo a la pinera o a un trabajador, baja su deuda y también lo que se le debe a la pinera o al trabajador.
 
 ## Desarrollo
 
@@ -54,4 +58,4 @@ node build.mjs
 
 ### Datos
 
-Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).
+Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, `nomina`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).

@@ -17,7 +17,9 @@ const NOMBRE_HOJA = 'Tablero Agrohermanos · datos';
 const ENTRADAS = 'Tablero Agrohermanos · entradas';
 const PROCESADOS = 'Tablero Agrohermanos · entradas procesadas';
 const COPIAS = 'Tablero Agrohermanos · copias';
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos'];
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
+// Pestañas que no son registros.
+const RESERVADAS = ['config'];
 const ENCABEZADO = ['id', 'fecha', 'resumen', 'datos'];
 
 function doGet() {
@@ -102,8 +104,12 @@ function escribir_(h, id, json, resumen) {
   h.getRange(n + 1, 1, 1, 4).setNumberFormat('@').setValues([fila]);
 }
 
+// Cualquier nombre simple sirve: así el tablero puede agregar tipos de registro sin cambiar este código.
+function colValida_(col) {
+  return /^[A-Za-z][A-Za-z0-9]{1,40}$/.test(String(col)) && RESERVADAS.indexOf(col) < 0;
+}
 function validarCol_(col) {
-  if (COLS.indexOf(col) < 0) throw new Error('Tipo de registro desconocido: ' + col);
+  if (!colValida_(col)) throw new Error('Tipo de registro desconocido: ' + col);
 }
 
 function conCandado_(fn) {
@@ -119,7 +125,9 @@ function cargarTodo() {
   prepararLibro_(libro);
   const importados = importarEntradas_(libro);
   const out = { sheetUrl: libro.getUrl(), importados: importados };
-  COLS.forEach(function (c) { out[c] = leerHoja_(hoja_(libro, c)); });
+  const nombres = COLS.slice();
+  libro.getSheets().forEach(function (h) { const nm = h.getName(); if (colValida_(nm) && nombres.indexOf(nm) < 0) nombres.push(nm); });
+  nombres.forEach(function (c) { out[c] = leerHoja_(hoja_(libro, c)); });
   const cfg = hoja_(libro, 'config');
   const v = cfg.getLastRow() >= 2 ? cfg.getRange(2, 4).getValue() : '';
   out.config = v ? JSON.parse(v) : {};
@@ -178,7 +186,7 @@ function prepararLibro_(libro) {
     ['La columna "resumen" es para leer; la columna "datos" es la que usa el tablero.'],
     ['Registra y edita desde el tablero, no a mano aquí, para que los cálculos no se dañen.'],
     [''],
-    ['Pestañas: listas (precios), clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, config.'],
+    ['Pestañas: listas (precios), clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, config.'],
   ]);
   h.getRange(1, 1).setFontWeight('bold').setFontSize(14);
   h.setColumnWidth(1, 720);
@@ -214,7 +222,7 @@ function importarEntradas_(libro) {
       const f = archivos.next();
       let j;
       try { j = JSON.parse(f.getBlob().getDataAsString('UTF-8')); } catch (e) { continue; }
-      COLS.forEach(function (c) {
+      Object.keys(j).filter(colValida_).forEach(function (c) {
         (Array.isArray(j[c]) ? j[c] : []).forEach(function (rec) {
           if (!rec || !rec.id) return;
           const copia = JSON.parse(JSON.stringify(rec));

@@ -26,7 +26,7 @@ const mondayOf = s => { const d = toD(s); const wd = (d.getUTCDay() + 6) % 7; re
 
 function cop(v, compact) {
   v = n(v);
-  const s = v < 0 ? '−' : '';
+  const s = v <= -0.5 ? '−' : '';
   const a = Math.abs(v);
   if (compact) {
     if (a >= 1e9) return `${s}$${(a / 1e9).toLocaleString('es-CO', { maximumFractionDigits: 2 })} mil M`;
@@ -68,6 +68,8 @@ const IC = {
   down: '<path d="M8 3v8M4.5 7.5 8 11l3.5-3.5M3 13.5h10"/>',
   up: '<path d="M8 13V5M4.5 8.5 8 5l3.5 3.5M3 2.5h10"/>',
   edit: '<path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/>',
+  pauta: '<path d="M2.5 6.5v3h2l4.5 3v-9l-4.5 3zM11.3 6.2a2.4 2.4 0 0 1 0 3.6M12.9 4.6a4.6 4.6 0 0 1 0 6.8"/>',
+  nomina: '<circle cx="6" cy="5.5" r="2"/><path d="M2.5 12.5c.4-2 1.8-3.2 3.5-3.2s3.1 1.2 3.5 3.2M10.5 3.8a2 2 0 0 1 0 3.6M11.6 9.5c1.1.5 1.8 1.5 2 3"/>',
   spark: '<path d="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.1 2.1M9.7 9.7l2.1 2.1M11.8 4.2 9.7 6.3M6.3 9.7l-2.1 2.1"/>',
 };
 const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k] || ''}</svg>`;
@@ -75,7 +77,7 @@ const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="non
 /* =========================================================================
    Modelo de datos
    ========================================================================= */
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos'];
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
 // Tabla de EJEMPLO (precio de la pinera por rastra según el largo). Los costos reales no van en el código:
 // se guardan en la configuración del tablero (Precios y costos → Editar costos).
 const PINERA_EJEMPLO = [
@@ -83,8 +85,9 @@ const PINERA_EJEMPLO = [
   [7.9, 230000], [8.9, 280000], [9.9, 320000], [10.9, 350000], [12.5, 380000],
 ].map(([hasta, valor]) => ({ hasta, valor }));
 const DEFAULT_CONFIG = {
-  socio: 'Rubén', punto: 'Barro Blanco', pctSocio: 50, diasCredito: 30, stockMin: 3,
+  socio: 'Rubén', punto: 'Barro Blanco', pctSocio: 50, diasCredito: 30, stockMin: 3, pauta: { campanas: [] },
   pinera: PINERA_EJEMPLO, aserrada: 50000, arriada: 5000, listaBB: '', listaBBVenta: '', listaFinal: '',
+  nomina: { desde: '', trabajadores: [] },
 };
 const MEDIOS = ['Transferencia', 'Efectivo', 'Consignación', 'Otro'];
 const GASTO_CATS = ['Flete', 'Cargue', 'Combustible', 'Aserrío', 'Arriería', 'Inmunización', 'Herramientas', 'Comisiones', 'Otro'];
@@ -104,6 +107,8 @@ const VIEWS = [
   { id: 'bb', label: 'Barro Blanco', icon: 'bb', group: 'Ventas' },
   { id: 'final', label: 'Cliente final', icon: 'final', group: 'Ventas' },
   { id: 'compras', label: 'Compras y gastos', icon: 'pinera', group: 'Costos' },
+  { id: 'pauta', label: 'Pauta', icon: 'pauta', group: 'Costos' },
+  { id: 'nomina', label: 'Nómina', icon: 'nomina', group: 'Costos' },
   { id: 'precios', label: 'Precios y costos', icon: 'catalogo', group: 'Ajustes' },
   { id: 'datos', label: 'Datos', icon: 'datos', group: 'Ajustes' },
 ];
@@ -134,7 +139,12 @@ const pref = {
 };
 
 const D = () => (S.demo ? DEMO.data : S.data);
-const CFG = () => (S.demo ? { ...DEFAULT_CONFIG, listaBBVenta: 'demo-l4' } : S.config);
+const CFG = () => (S.demo ? { ...DEFAULT_CONFIG, listaBBVenta: 'demo-l4', pauta: demoPauta(), nomina: demoNomina() } : S.config);
+const demoNomina = () => ({ desde: addDays(todayStr(), -56), trabajadores: [{ id: 'demo-t1', nombre: 'Aserrador (ejemplo)', concepto: 'aserrada' }, { id: 'demo-t2', nombre: 'Arriero (ejemplo)', concepto: 'arriada' }] });
+function demoPauta() {
+  const hoy = todayStr(), antes = addDays(hoy.slice(0, 7) + '-01', -1).slice(0, 7);
+  return { campanas: [{ id: 'demo-p1', nombre: 'Campaña Meta (ejemplo)', plataforma: 'Meta (Facebook e Instagram)', presupuestoDiario: 30000, inicio: addDays(hoy, -120), fin: '', reales: { [antes]: 870000 } }] };
+}
 
 /* =========================================================================
    Almacenamiento: base de datos de Claude (db) o, si no existe, este navegador
@@ -159,6 +169,7 @@ function resumenDe(col, r) {
       case 'gastos': return `${r.categoria || 'Gasto'} · ${r.descripcion || ''} · ${cop(r.valor)}`;
       case 'listas': return `${r.nombre} · ${Object.keys(r.precios || {}).length} medidas`;
       case 'clientes': return `${r.nombre} · ${r.tipo === 'final' ? 'cliente final' : 'mayorista'}`;
+      case 'nomina': return `${r.tipo === 'cargo' ? 'Trabajo extra' : 'Pago'} · ${(S.config.nomina?.trabajadores || []).find(t => t.id === r.trabajadorId)?.nombre || ''} · ${cop(r.valor)}`;
       default: return `${cop(r.valor)}${r.medio ? ' · ' + r.medio : ''}`;
     }
   } catch { return ''; }
@@ -294,6 +305,8 @@ function pineraRate(L, cfg = CFG()) {
 }
 const manoObra = (cfg = CFG()) => n(cfg.aserrada) + n(cfg.arriada);
 const costoRastra = (L, cfg = CFG()) => pineraRate(L, cfg) + manoObra(cfg);
+// Tarifa por rastra de un trabajador: la de aserrada o arriada vigente cuando se despachó (guardada en la remisión) o la de hoy.
+const tarifaTrab = (t, ref, cfg = CFG()) => t.concepto === 'aserrada' ? n(ref?.mo?.aserrada ?? cfg.aserrada) : t.concepto === 'arriada' ? n(ref?.mo?.arriada ?? cfg.arriada) : n(t.tarifa);
 function piezaInfo(medida, largo, cfg = CFG()) {
   const m = parseMedida(medida), L = n(largo);
   if (!m || !L) return null;
@@ -393,14 +406,18 @@ function model() {
     const pedidos = d.ventas.filter(v => v.canal === 'mayorista' && v.clienteId === c.id && v.estado !== 'Por entregar')
       .map(v => ({ v, total: calcVenta(v).total, vence: addDays(v.fecha, dias) }))
       .sort((a, b) => (a.v.fecha || '').localeCompare(b.v.fecha || ''));
+    // Saldo con el que arrancó en el tablero: si te debía, cuenta como el pedido más viejo; si tenía plata a favor, como un abono.
+    const si = n(c.saldoInicial);
+    const siFecha = isDate(c.saldoInicialFecha) ? c.saldoInicialFecha : (String(c.creado || '').slice(0, 10) || hoy);
+    if (si > 0.5) pedidos.unshift({ v: { id: 'saldo-inicial-' + c.id, fecha: siFecha, saldoInicial: true }, total: si, vence: addDays(siFecha, dias) });
     const abonos = d.abonos.filter(a => a.clienteId === c.id);
-    let pool = sum(abonos, a => a.valor);
+    let pool = sum(abonos, a => a.valor) + (si < -0.5 ? -si : 0);
     for (const p of pedidos) { const pay = Math.min(pool, p.total); p.pagado = pay; p.pend = p.total - pay; pool -= pay; }
     const pend = pedidos.filter(p => p.pend > 0.5);
     const venc = pend.filter(p => p.vence < hoy);
     cartera.set(c.id, {
       cliente: c, pedidos, abonos, dias,
-      saldo: sum(pedidos, p => p.total) - sum(abonos, a => a.valor),
+      saldo: sum(pedidos, p => p.total) - sum(abonos, a => a.valor) + (si < -0.5 ? si : 0),
       vencido: sum(venc, p => p.pend),
       mora: venc.length ? Math.max(...venc.map(p => diffDays(p.vence, hoy))) : 0,
       prox: pend.filter(p => p.vence >= hoy).map(p => p.vence).sort()[0] || '',
@@ -431,9 +448,33 @@ function model() {
   const ledger = [
     ...d.pineraCompras.map(x => ({ tipo: 'cargo', fecha: x.fecha, valor: n(x.valor), rastras: n(x.rastras), ref: x, col: 'pineraCompras' })),
     ...d.pineraPagos.map(x => ({ tipo: 'pago', fecha: x.fecha, valor: n(x.valor), ref: x, col: 'pineraPagos' })),
+    ...d.abonos.filter(a => a.destino === 'pinera').map(a => ({ tipo: 'pago', fecha: a.fecha, valor: n(a.valor), ref: { ...a, medio: `Le pagó ${cli.get(a.clienteId)?.nombre || 'un cliente'}`, nota: a.nota || '' }, col: 'abonos' })),
   ].sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.tipo === 'cargo' ? -1 : 1));
   let run = 0;
   for (const m of ledger) { run += m.tipo === 'cargo' ? m.valor : -m.valor; m.saldo = run; }
+
+  // Nómina: cada remisión despachada desde la fecha de arranque suma sus rastras × la tarifa de cada trabajador.
+  const nom = cfg.nomina || {};
+  const trab = Array.isArray(nom.trabajadores) ? nom.trabajadores.filter(t => t.activo !== false) : [];
+  const desdeN = isDate(nom.desde) ? nom.desde : '9999-12-31';
+  const despachos = [];
+  for (const v of d.ventas) {
+    if ((v.canal === 'mayorista' && v.estado === 'Por entregar') || (v.canal === 'final' && v.estado === 'Pendiente') || !isDate(v.fecha) || v.fecha < desdeN) continue;
+    const c = calcVenta(v);
+    if (c.rastras > 0) despachos.push({ fecha: v.fecha, col: 'ventas', ref: v, remision: v.remision || '', destino: v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista') : (cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final'), rastras: c.rastras });
+  }
+  for (const m of d.bbDespachos) {
+    if (m.tipo === 'devolucion' || !isDate(m.fecha) || m.fecha < desdeN) continue;
+    const c = calcVenta(m);
+    if (c.rastras > 0) despachos.push({ fecha: m.fecha, col: 'bbDespachos', ref: m, remision: m.remision || '', destino: cfg.punto, rastras: c.rastras });
+  }
+  const nominaMovs = [];
+  for (const x of despachos) for (const t of trab) nominaMovs.push({ fecha: x.fecha, tipo: 'devengo', trabajadorId: t.id, valor: Math.round(x.rastras * tarifaTrab(t, x.ref, cfg)), rastras: x.rastras, detalle: `${x.remision ? 'Rem. ' + x.remision + ' · ' : ''}${x.destino}`, col: x.col, id: x.ref.id });
+  for (const r of d.nomina) if (isDate(r.fecha) && r.fecha >= desdeN) nominaMovs.push({ fecha: r.fecha, tipo: r.tipo === 'cargo' ? 'cargo' : 'pago', trabajadorId: r.trabajadorId, valor: n(r.valor), rastras: 0, detalle: r.concepto || r.nota || (r.tipo === 'cargo' ? 'Trabajo extra' : ''), medio: r.medio || '', col: 'nomina', id: r.id });
+  for (const a of d.abonos) if (String(a.destino || '').startsWith('nomina:') && isDate(a.fecha) && a.fecha >= desdeN) nominaMovs.push({ fecha: a.fecha, tipo: 'pago', trabajadorId: a.destino.slice(7), valor: n(a.valor), rastras: 0, detalle: `Le pagó ${cli.get(a.clienteId)?.nombre || 'un cliente'} (abono)`, col: 'abonos', id: a.id });
+  nominaMovs.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.tipo === 'pago' ? 1 : -1));
+  const nominaSaldo = new Map(trab.map(t => [t.id, 0]));
+  for (const m of nominaMovs) { const s1 = (nominaSaldo.get(m.trabajadorId) || 0) + (m.tipo === 'pago' ? -m.valor : m.valor); nominaSaldo.set(m.trabajadorId, s1); m.saldo = s1; }
 
   const finalSaldo = sum(entries.filter(e => e.canal === 'final'), e => Math.max(0, e.calc.saldo));
   const mayorSaldo = sum([...cartera.values()], c => Math.max(0, c.saldo));
@@ -443,7 +484,7 @@ function model() {
   ].map(x => x.fecha).filter(isDate).sort();
 
   porEntregar.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
+  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
   MODEL_KEY = key;
   return MODEL;
 }
@@ -699,7 +740,8 @@ function renderBanner() {
 const MENU = [
   ['Ventas', [['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final']]],
   ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta reportada por Rubén'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto'], ['bb-danada', 'Pieza dañada']]],
-  ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto']]],
+  ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto'], ['campana', 'Campaña de pauta'], ['pauta-real', 'Cobro real de pauta del mes']]],
+  ['Nómina', [['nomina-pago', 'Pago de nómina'], ['nomina-cargo', 'Trabajo extra']]],
   ['Configuración', [['cliente', 'Cliente mayorista'], ['cliente-final', 'Cliente final'], ['lista', 'Lista de precios']]],
 ];
 function renderMenu() {
@@ -734,9 +776,13 @@ function prevRange(R) {
 function periodo(M, R) {
   const E = M.entries.filter(e => inR(e.fecha, R));
   const G = M.d.gastos.filter(g => inR(g.fecha, R));
-  const ingreso = sum(E, e => e.ingreso), utilB = sum(E, e => e.util), gastos = sum(G, g => g.valor);
-  return { E, G, ingreso, utilB, gastos, utilN: utilB - gastos, rastras: sum(E, e => e.rastras), piezas: sum(E, e => e.piezas) };
+  const PD = pautaDias(M.cfg, R.from, R.to, M.hoy), pauta = sum(PD, x => x.valor);
+  const NX = nominaExtras(M, R), extras = sum(NX, x => x.valor);
+  const ingreso = sum(E, e => e.ingreso), utilB = sum(E, e => e.util), gastos = sum(G, g => g.valor) + pauta + extras;
+  return { E, G, PD, pauta, NX, extras, ingreso, utilB, gastos, utilN: utilB - gastos, rastras: sum(E, e => e.rastras), piezas: sum(E, e => e.piezas) };
 }
+// Trabajos extra de nómina: no son por rastra, así que no están en el costo y cuentan como gasto.
+const nominaExtras = (M, R) => M.nominaMovs.filter(m => m.tipo === 'cargo' && inR(m.fecha, R));
 function trend(R, entries, gastos, pick) {
   const B = bucketize(R);
   const a = B.keys.map(() => 0), b = B.keys.map(() => 0);
@@ -775,6 +821,8 @@ function alertas(M) {
     out.push([ult && diffDays(ult, M.hoy) > 15 ? 'warn' : 'info', `${M.cfg.socio} te debe ${cop(M.bbSaldo)}`, ult ? `Último pago el ${fmtDate(ult)}.` : 'Todavía no hay pagos registrados.', 'bb']);
   }
   if (M.pineraSaldo > 0.5) out.push(['info', `Le debes ${cop(M.pineraSaldo)} a la pinera`, 'Saldo del estado de cuenta con La Pinera.', 'compras']);
+  const debeN = M.trab.filter(t => (M.nominaSaldo.get(t.id) || 0) > 0.5);
+  if (debeN.length) { const sab = sabadoDe(M.hoy), dd = diffDays(M.hoy, sab); out.push([dd <= 1 ? 'warn' : 'info', `Nómina: le debes ${cop(sum(debeN, t => M.nominaSaldo.get(t.id)))}`, `${debeN.map(t => `${t.nombre} ${cop(M.nominaSaldo.get(t.id))}`).join(' · ')}. Se paga el sábado ${fmtDay(sab)}${dd === 0 ? ' (hoy)' : ''}.`, 'nomina']); }
   if (M.finalSaldo > 0.5) out.push(['warn', `Clientes finales te deben ${cop(M.finalSaldo)}`, 'Pedidos con pago pendiente.', 'final']);
   return out;
 }
@@ -812,7 +860,7 @@ VIEW_FN.resumen = R => {
     ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}`, { cls: 'sm' })}
     ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), M.pineraSaldo >= 0 ? 'Le debes' : 'A tu favor', { cls: 'sm' })}
     ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `${cop(invVal)} a precio de sociedad`, { cls: 'sm' })}
-    ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} registros · ya restados de la utilidad`, { cls: 'sm' })}
+    ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm' })}
   </div>`;
 
   if (!M.firstDate) return top + onboarding();
@@ -842,7 +890,7 @@ VIEW_FN.resumen = R => {
 
   return `${top}${pos}
     <div class="grid g-2-1">
-      ${card('Ventas y utilidad', trendLegend('Ventas', 'Utilidad neta') + trendChart(R, P.E, P.G), { sub: 'Lo que te queda a ti en cada canal, después de costos y gastos.' })}
+      ${card('Ventas y utilidad', trendLegend('Ventas', 'Utilidad neta') + trendChart(R, P.E, [...P.G, ...P.PD, ...P.NX]), { sub: 'Lo que te queda a ti en cada canal, después de costos, gastos y pauta.' })}
       ${card('Ventas por canal', donut, { sub: 'Barro Blanco cuenta lo que Rubén te liquida.' })}
     </div>
     <div class="grid g-1-1">
@@ -876,7 +924,7 @@ VIEW_FN.mayoristas = R => {
     const st = k.vencido > 0.5 ? chip('crit', `${cop(k.vencido, true)} vencido`, 'alert') : k.saldo > 0.5 ? chip('', 'Al día', 'clock') : k.saldo < -0.5 ? chip('good', `Anticipo ${cop(-k.saldo, true)}`, 'check') : chip('good', 'Sin deuda', 'check');
     const pe = M.porEntregar.filter(p => p.ref.clienteId === c.id);
     return `<button type="button" class="client" data-act="cli" data-id="${esc(c.id)}" aria-pressed="${sel === c.id}">
-      <div class="client-h"><div><b>${esc(c.nombre)}</b><span>${esc(lista ? lista.nombre : 'Sin lista de precios')} · ${k.dias ? `${k.dias} días de crédito` : 'De contado'}</span></div>${st}</div>
+      <div class="client-h"><div><b>${esc(c.nombre)}</b><span>${esc(lista ? lista.nombre : 'Sin lista de precios')} · ${k.dias ? `${k.dias} días de crédito` : 'De contado'}${n(c.saldoInicial) ? ` · arrancó ${n(c.saldoInicial) > 0 ? 'debiendo' : 'con'} ${cop(Math.abs(n(c.saldoInicial)), true)}${n(c.saldoInicial) < 0 ? ' a favor' : ''}` : ''}</span></div>${st}</div>
       <dl><div><dt>${k.saldo < -0.5 ? 'Anticipo' : 'Saldo'}</dt><dd>${cop(Math.abs(k.saldo))}</dd></div><div><dt>${pe.length ? 'Por entregar' : 'Próximo vence'}</dt><dd>${pe.length ? `${fmtDay(pe[0].fecha)} · ${num(sum(pe, p => p.calc.piezas), 0)} pzs` : k.prox ? fmtDay(k.prox) : '—'}</dd></div>
       <div><dt>Rastras período</dt><dd>${num(sum(mine, e => e.rastras))}</dd></div><div><dt>Utilidad período</dt><dd>${cop(sum(mine, e => e.util), true)}</dd></div></dl>
     </button>`;
@@ -907,7 +955,7 @@ VIEW_FN.mayoristas = R => {
   const ab = table([
     { h: 'Fecha', f: a => `<span class="num">${fmtDate(a.fecha)}</span>` },
     { h: 'Cliente', f: a => esc(M.cli.get(a.clienteId)?.nombre || '—') },
-    { h: 'Medio', f: a => esc(a.medio || '—') },
+    { h: 'Medio', f: a => `${esc(a.medio || '—')}${a.destino ? `<span class="sub">${esc(destinoTxt(a, M))}</span>` : ''}` },
     { h: 'Nota', f: a => `<span class="muted">${esc(a.nota || '')}</span>` },
     { h: 'Valor', r: 1, f: a => cop(a.valor) },
   ], A, { act: a => editAttr('abonos', a.id), empty: '<p>No hay abonos en este período.</p>', foot: A.length > 1 ? ['Total', '', '', '', cop(sum(A, a => a.valor))] : null });
@@ -1083,11 +1131,12 @@ VIEW_FN.compras = R => {
   const prom = sum(madera, m => m.rastras) ? sum(madera, m => m.valor) / sum(madera, m => m.rastras) : 0;
   const G = M.d.gastos.filter(g => inR(g.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const gTot = sum(G, g => g.valor);
+  const pautaR = sum(pautaDias(M.cfg, R.from, R.to, M.hoy), x => x.valor), extraR = sum(nominaExtras(M, R), x => x.valor);
   const kp = `<div class="kpis">
     ${kpi('Saldo con la pinera hoy', cop(Math.abs(M.pineraSaldo)), M.pineraSaldo >= 0 ? 'Le debes a la pinera' : 'A tu favor (pagaste de más)', { cls: M.pineraSaldo > 0 ? '' : 'pos', dot: 'var(--s2)' })}
     ${kpi('Compra de madera', cop(sum(compras, m => m.valor)), `${num(sum(compras, m => m.rastras))} rastras · promedio ${cop(prom)}/rastra`)}
     ${kpi('Pagos a la pinera', cop(sum(pagos, m => m.valor)), `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'} en el período`)}
-    ${kpi('Gastos', cop(gTot), `${G.length} ${G.length === 1 ? 'registro' : 'registros'} en el período`)}
+    ${kpi('Gastos', cop(gTot + pautaR + extraR), pautaR || extraR ? `${cop(gTot, true)} registrados${pautaR ? ` + ${cop(pautaR, true)} de pauta` : ''}${extraR ? ` + ${cop(extraR, true)} de nómina extra` : ''}` : `${G.length} ${G.length === 1 ? 'registro' : 'registros'} en el período`)}
   </div>`;
   // saldo con la pinera al final de cada tramo del rango
   const B = bucketize(R);
@@ -1107,17 +1156,196 @@ VIEW_FN.compras = R => {
     { h: 'Saldo', r: 1, f: m => `<b class="${m.saldo < 0 ? 'pos' : ''}">${cop(m.saldo)}</b>` },
   ], L.slice().reverse(), { act: m => editAttr(m.col, m.ref.id), empty: '<p>No hay movimientos con la pinera en este período.</p>' });
   const byCat = new Map(); for (const g of G) byCat.set(g.categoria || 'Otro', (byCat.get(g.categoria || 'Otro') || 0) + n(g.valor));
+  if (pautaR) byCat.set('Pauta (Meta)', pautaR);
+  if (extraR) byCat.set('Nómina (extras)', extraR);
   const cats = [...byCat.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
   const gt = table([
     { h: 'Fecha', f: g => `<span class="num">${fmtDate(g.fecha)}</span>` },
     { h: 'Categoría', f: g => esc(g.categoria || 'Otro') },
     { h: 'Descripción', f: g => `${esc(g.descripcion || '')}<span class="sub">${esc(g.canal || 'General')}</span>` },
     { h: 'Valor', r: 1, f: g => cop(g.valor) },
-  ], G, { act: g => editAttr('gastos', g.id), empty: '<p>No hay gastos en este período.</p>', foot: G.length > 1 ? ['Total', '', '', cop(gTot)] : null });
+  ], G, { act: g => editAttr('gastos', g.id), empty: '<p>No hay gastos registrados en este período.</p>', foot: G.length > 1 ? ['Total', '', '', cop(gTot)] : null })
+    + (pautaR ? `<div class="note" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>Más <b>${cop(pautaR)}</b> de pauta en Meta en este período.</span>${btn('Ver pauta', 'data-act="nav" data-v="pauta"', 'sm')}</div>` : '');
   return `${head}${kp}
     ${card('Saldo con la pinera en el tiempo', ch, { sub: 'Por encima de cero le debes a la pinera; por debajo, tienes saldo a favor.' })}
     ${card('Compra de madera · estado de cuenta con la pinera', t, { sub: 'Del más reciente al más antiguo. El saldo es acumulado desde el primer movimiento.', acts: addBtn('Compra', 'pinera-compra') + addBtn('Pago', 'pinera-pago') })}
     <div class="grid g-2-1">${card('Gastos', gt, { acts: addBtn('Gasto', 'gasto') })}${card('Gastos por categoría', cats.length ? hbars(cats, { fmt: v => cop(v, true), color: 'var(--s2)' }) : '<p class="muted">Sin gastos en el período.</p>')}</div>`;
+};
+
+/* ---------- Pauta (publicidad en Meta) ---------- */
+const PLATAFORMAS = ['Meta (Facebook e Instagram)', 'Google', 'TikTok', 'Otra'];
+const campanas = (cfg = CFG()) => (cfg.pauta && Array.isArray(cfg.pauta.campanas) ? cfg.pauta.campanas : []);
+const campActiva = (c, f, hoy) => isDate(c.inicio) && f >= c.inicio && (!isDate(c.fin) || f <= c.fin) && f <= hoy;
+const finDeMes = mes => addDays(fromD(new Date(Date.UTC(+mes.slice(0, 4), +mes.slice(5, 7), 1))), -1);
+function diasActivosMes(c, mes, hoy) {
+  let k = 0;
+  for (let f = mes + '-01'; f.slice(0, 7) === mes; f = addDays(f, 1)) if (campActiva(c, f, hoy)) k++;
+  return k;
+}
+const tieneReal = (c, mes) => c.reales && c.reales[mes] !== undefined && c.reales[mes] !== null && c.reales[mes] !== '';
+// Gasto de pauta día por día: el cobro real del mes repartido entre sus días activos o, si no hay, el presupuesto diario.
+function pautaDias(cfg, from, to, hoy) {
+  const out = [], cs = campanas(cfg);
+  const ini = cs.map(c => c.inicio).filter(isDate).sort()[0];
+  if (!ini) return out;
+  const fin = to < hoy ? to : hoy, cache = new Map();
+  for (let f = from < ini ? ini : from; f <= fin; f = addDays(f, 1)) {
+    let v = 0;
+    for (const c of cs) {
+      if (!campActiva(c, f, hoy)) continue;
+      const mes = f.slice(0, 7);
+      if (tieneReal(c, mes)) {
+        const k = (c.id || c.nombre) + mes;
+        if (!cache.has(k)) cache.set(k, diasActivosMes(c, mes, hoy));
+        v += n(c.reales[mes]) / Math.max(1, cache.get(k));
+      } else v += n(c.presupuestoDiario);
+    }
+    if (v) out.push({ fecha: f, valor: v });
+  }
+  return out;
+}
+
+VIEW_FN.pauta = R => {
+  const M = model(), cfg = M.cfg, hoy = M.hoy, cs = campanas(cfg);
+  const head = `<div class="section-h"><p>Lo que inviertes en publicidad en Meta (Facebook e Instagram). El gasto se calcula con el presupuesto diario de cada campaña; si Meta te cobra otro valor en un mes, registra el cobro real y ese reemplaza el cálculo. La pauta se suma a los gastos y se resta de la utilidad neta.</p>
+    <div class="acts">${addBtn('Campaña', 'campana', 'primary sm')}${cs.length ? addBtn('Cobro real del mes', 'pauta-real') : ''}</div></div>`;
+  if (!cs.length) return head + card('', emptyState('Todavía no hay campañas', 'Crea tu campaña de Meta con su presupuesto diario y la fecha en que arrancó. El gasto de cada mes se calcula solo.', addBtn('Campaña', 'campana', '')));
+
+  const PD = pautaDias(cfg, R.from, R.to, hoy), pautaR = sum(PD, x => x.valor);
+  const activas = cs.filter(c => campActiva(c, hoy, hoy));
+  const diario = sum(activas, c => c.presupuestoDiario);
+  const mes = hoy.slice(0, 7), fm = finDeMes(mes), quedan = diffDays(hoy, fm);
+  const llevaMes = sum(pautaDias(cfg, mes + '-01', hoy, hoy), x => x.valor);
+  const proy = llevaMes + sum(activas, c => n(c.presupuestoDiario) * Math.max(0, isDate(c.fin) ? Math.min(quedan, diffDays(hoy, c.fin)) : quedan));
+  const fin = M.entries.filter(e => e.canal === 'final' && inR(e.fecha, R)), vf = sum(fin, e => e.ingreso);
+
+  const kp = `<div class="kpis">
+    ${kpi('Pauta del período', cop(pautaR), `${PD.length} ${PD.length === 1 ? 'día' : 'días'} con pauta · ya restada de la utilidad`, { dot: 'var(--s2)' })}
+    ${kpi('Presupuesto diario', cop(diario), `${activas.length} ${activas.length === 1 ? 'campaña activa' : 'campañas activas'} · ${cop(diario * 30, true)} al mes`)}
+    ${kpi(`Proyección de ${MESES[+mes.slice(5, 7) - 1]}`, cop(proy), `Llevas ${cop(llevaMes)}; si sigue igual hasta el ${fmtDay(fm)}`)}
+    ${kpi('Ventas a clientes finales por cada $1', pautaR && vf ? `$${num(vf / pautaR, 1)}` : '—', fin.length ? `${fin.length} ${fin.length === 1 ? 'pedido' : 'pedidos'} · ${cop(pautaR / fin.length)} de pauta por pedido` : 'Sin pedidos de clientes finales en el período')}
+  </div>`;
+
+  // Pauta frente a ventas a clientes finales, en el tiempo
+  const B = bucketize(R);
+  const pv = B.keys.map(() => 0), vv = B.keys.map(() => 0);
+  for (const d of PD) { const i = B.index.get(B.keyOf(d.fecha)); if (i != null) pv[i] += d.valor; }
+  for (const e of fin) { const i = B.index.get(B.keyOf(e.fecha)); if (i != null) vv[i] += e.ingreso; }
+  const ch = chartSlot({ type: 'line', labels: B.keys, fmtX: B.label, tipX: B.tipLabel, fmtY: v => cop(v, true), fmtTip: v => cop(v), aria: 'Pauta y ventas a clientes finales',
+    series: [{ label: 'Ventas a clientes finales', color: 'var(--s3)', values: vv }, { label: 'Pauta', color: 'var(--s2)', values: pv, area: true }] }, 220);
+  const leg = `<div class="legend"><span><i style="background:var(--s3)"></i>Ventas a clientes finales</span><span><i style="background:var(--s2)"></i>Pauta</span></div>`;
+
+  // Mes a mes
+  const primero = cs.map(c => c.inicio).filter(isDate).sort()[0].slice(0, 7);
+  const meses = [];
+  for (let m = mes; m >= primero && meses.length < 12; m = addDays(m + '-01', -1).slice(0, 7)) meses.push(m);
+  const filas = meses.map(m => {
+    const dias = sum(cs, c => diasActivosMes(c, m, hoy));
+    const presu = sum(cs, c => n(c.presupuestoDiario) * diasActivosMes(c, m, hoy));
+    const reales = cs.filter(c => tieneReal(c, m));
+    const usado = sum(pautaDias(cfg, m + '-01', finDeMes(m), hoy), x => x.valor);
+    const ef = M.entries.filter(e => e.canal === 'final' && (e.fecha || '').slice(0, 7) === m);
+    return { m, dias, presu, real: reales.length ? sum(reales, c => c.reales[m]) : null, usado, ped: ef.length, ventas: sum(ef, e => e.ingreso) };
+  });
+  const tm = table([
+    { h: 'Mes', f: x => `<b>${MESES[+x.m.slice(5, 7) - 1]} ${x.m.slice(0, 4)}</b>` },
+    { h: 'Días activos', r: 1, f: x => num(x.dias, 0) },
+    { h: 'Por presupuesto', r: 1, f: x => cop(x.presu) },
+    { h: 'Cobro real de Meta', r: 1, f: x => x.real == null ? '<span class="muted">Sin registrar</span>' : cop(x.real) },
+    { h: 'Gasto contado', r: 1, f: x => `<b>${cop(x.usado)}</b>` },
+    { h: 'Pedidos finales', r: 1, f: x => num(x.ped, 0) },
+    { h: 'Ventas finales', r: 1, f: x => cop(x.ventas) },
+    { h: 'Ventas por $1', r: 1, f: x => x.usado && x.ventas ? `$${num(x.ventas / x.usado, 1)}` : '—' },
+  ], filas, { act: x => `data-act="pauta-mes" data-mes="${x.m}"` });
+
+  const tc = table([
+    { h: 'Campaña', f: c => `<span class="cell-strong">${esc(c.nombre)}</span><span class="sub">${esc(c.plataforma || '')}</span>` },
+    { h: 'Presupuesto diario', r: 1, f: c => cop(c.presupuestoDiario) },
+    { h: 'Desde', f: c => `<span class="num">${fmtDate(c.inicio)}</span>` },
+    { h: 'Hasta', f: c => isDate(c.fin) ? `<span class="num">${fmtDate(c.fin)}</span>` : '<span class="muted">Sigue activa</span>' },
+    { h: 'Estado', f: c => c.inicio > hoy ? chip('', 'Programada', 'clock') : isDate(c.fin) && c.fin < hoy ? chip('', 'Terminada') : chip('good', 'Activa', 'check') },
+    { h: 'Gastado en total', r: 1, f: c => cop(sum(pautaDias({ pauta: { campanas: [c] } }, c.inicio, hoy, hoy), x => x.valor)) },
+  ], cs, { act: c => `data-act="campana-edit" data-id="${esc(c.id)}"` });
+
+  return `${head}${kp}
+    ${card('Pauta y ventas a clientes finales', leg + ch, { sub: 'La publicidad trae clientes finales: compara lo que inviertes con lo que te compran.' })}
+    ${card('Mes a mes', tm, { sub: 'Toca un mes para registrar o corregir lo que Meta te cobró.', acts: addBtn('Cobro real del mes', 'pauta-real') })}
+    ${card('Campañas', tc, { sub: 'Toca una campaña para cambiar su presupuesto o ponerle fecha final si la apagas.', acts: addBtn('Campaña', 'campana') })}`;
+};
+
+/* ---- Nómina: se gana con cada despacho (rastras × tarifa) y se paga los sábados ---- */
+const sabadoDe = s => addDays(s, 6 - toD(s).getUTCDay());
+const OFICIOS = [['aserrada', 'Aserrada'], ['arriada', 'Arriada']];
+const oficioDe = t => (OFICIOS.find(o => o[0] === t.concepto) || [, 'Otro'])[1];
+VIEW_FN.nomina = R => {
+  const M = model(), cfg = M.cfg, hoy = M.hoy;
+  const head = `<div class="section-h"><p>Lo que le debes a cada trabajador. Cada remisión que se carga suma sus rastras por la tarifa de aserrada o arriada; cada pago lo baja. Les pagas los sábados. Esta plata ya está dentro del costo real de la madera, así que no se resta otra vez de la utilidad.</p>
+    <div class="acts">${M.trab.length ? addBtn('Pago de nómina', 'nomina-pago', 'primary sm') + addBtn('Trabajo extra', 'nomina-cargo') : ''}${btn(`${icon('edit')}Trabajadores`, 'data-act="form" data-form="nomina-config"', 'sm')}</div></div>`;
+  if (!M.trab.length) return head + card('', emptyState('Configura la nómina', 'Agrega a los trabajadores, qué hace cada uno (aserrada o arriada) y desde qué fecha arranca la cuenta. Desde ese día, cada despacho suma lo que les debes.', btn(`${icon('plus')}Configurar nómina`, 'data-act="form" data-form="nomina-config"', '')));
+
+  const sab = sabadoDe(hoy), dom = addDays(sab, -6);
+  const movs = M.nominaMovs;
+  const debe = sum(M.trab, t => Math.max(0, M.nominaSaldo.get(t.id) || 0));
+  const enR = movs.filter(m => inR(m.fecha, R));
+  const dev = enR.filter(m => m.tipo !== 'pago'), pag = enR.filter(m => m.tipo === 'pago');
+  const despR = M.despachos.filter(x => inR(x.fecha, R)), despS = M.despachos.filter(x => x.fecha >= dom && x.fecha <= sab);
+  const kp = `<div class="kpis">
+    ${kpi('Debes hoy', cop(debe), M.trab.map(t => { const v = M.nominaSaldo.get(t.id) || 0; return `${esc(t.nombre)} ${v < -0.5 ? `adelanto ${cop(-v, true)}` : cop(v, true)}`; }).join(' · '), { dot: 'var(--s2)' })}
+    ${kpi(`Semana al sábado ${fmtDay(sab)}`, `${num(sum(despS, x => x.rastras))} rastras`, `${despS.length} ${despS.length === 1 ? 'remisión cargada' : 'remisiones cargadas'} desde el ${fmtDay(dom)}`)}
+    ${kpi('Nómina del período', cop(sum(dev, m => m.valor)), `${num(sum(despR, x => x.rastras))} rastras despachadas · ya incluida en el costo`)}
+    ${kpi('Pagado en el período', cop(sum(pag, m => m.valor)), `${pag.length} ${pag.length === 1 ? 'pago' : 'pagos'}`)}
+  </div>`;
+
+  const cards = M.trab.map(t => {
+    const s1 = M.nominaSaldo.get(t.id) || 0;
+    const mine = movs.filter(m => m.trabajadorId === t.id);
+    const ult = mine.filter(m => m.tipo === 'pago').pop();
+    const sem = sum(mine.filter(m => m.tipo !== 'pago' && m.fecha >= dom && m.fecha <= sab), m => m.valor);
+    const st = s1 > 0.5 ? chip('', `Le debes ${cop(s1, true)}`, 'clock') : s1 < -0.5 ? chip('', `Adelanto ${cop(-s1, true)}`, 'info') : chip('good', 'Al día', 'check');
+    return `<div class="client" style="cursor:default">
+      <div class="client-h"><div><b>${esc(t.nombre)}</b><span>${oficioDe(t)} · ${cop(tarifaTrab(t, null, cfg))} por rastra</span></div>${st}</div>
+      <dl><div><dt>${s1 < -0.5 ? 'Adelanto' : 'Por pagar'}</dt><dd>${cop(Math.abs(s1))}</dd></div><div><dt>Esta semana</dt><dd>${cop(sem)}</dd></div>
+      <div><dt>Último pago</dt><dd>${ult ? `${fmtDay(ult.fecha)} · ${cop(ult.valor, true)}` : '—'}</dd></div><div><dt>Período</dt><dd>${cop(sum(dev.filter(m => m.trabajadorId === t.id), m => m.valor), true)}</dd></div></dl>
+      <div style="margin-top:12px">${btn(`${icon('plus')}Registrar pago`, `data-act="nomina-pagar" data-id="${esc(t.id)}"`, s1 > 0.5 ? 'primary sm' : 'sm')}</div>
+    </div>`;
+  }).join('');
+
+  // Pedidos que todavía no se cargan: suman a la nómina el día que salgan.
+  const pend = [...M.porEntregar.map(p => ({ fecha: p.fecha, quien: p.cliente, rastras: p.calc.rastras, id: p.id })),
+    ...M.d.ventas.filter(v => v.canal === 'final' && v.estado === 'Pendiente').map(v => ({ fecha: v.fecha, quien: M.cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final', rastras: calcVenta(v).rastras, id: v.id }))];
+  const tarifaT = sum(M.trab, t => tarifaTrab(t, null, cfg));
+  const pendNote = pend.length ? `<div class="note" style="margin-bottom:16px">Por cargar: ${pend.map(p => `<b>${esc(p.quien)}</b> ${num(p.rastras)} rastras`).join(' · ')}. Cuando los marques como entregados o despachados suman unos <b>${cop(sum(pend, p => p.rastras) * tarifaT)}</b> a la nómina.</div>` : '';
+
+  // Semanas de pago (domingo a sábado)
+  const semanas = [];
+  const primero = M.desdeN <= hoy ? sabadoDe(M.desdeN) : sab;
+  for (let s = sab; s >= primero && semanas.length < 12; s = addDays(s, -7)) {
+    const d0 = addDays(s, -6), ms = movs.filter(m => m.fecha >= d0 && m.fecha <= s), ds = M.despachos.filter(x => x.fecha >= d0 && x.fecha <= s);
+    let cierre = 0; for (const m of movs) if (m.fecha <= s) cierre += m.tipo === 'pago' ? -m.valor : m.valor;
+    semanas.push({ s, d0, rem: ds.length, ras: sum(ds, x => x.rastras), por: M.trab.map(t => sum(ms.filter(m => m.trabajadorId === t.id && m.tipo !== 'pago'), m => m.valor)), pago: sum(ms.filter(m => m.tipo === 'pago'), m => m.valor), cierre });
+  }
+  const ts = table([
+    { h: 'Sábado', f: w => `<b class="num">${fmtDate(w.s)}</b><span class="sub">desde el ${fmtDay(w.d0)}${w.s === sab ? ' · esta semana' : ''}</span>` },
+    { h: 'Remisiones', r: 1, f: w => num(w.rem, 0) },
+    { h: 'Rastras', r: 1, f: w => num(w.ras) },
+    ...M.trab.map((t, i) => ({ h: esc(t.nombre), r: 1, f: w => cop(w.por[i]) })),
+    { h: 'Pagado', r: 1, f: w => cop(w.pago) },
+    { h: 'Saldo al cierre', r: 1, f: w => `<b class="${w.cierre < -0.5 ? 'pos' : ''}">${cop(w.cierre)}</b>` },
+  ], semanas, { empty: '<p>Todavía no hay semanas.</p>' });
+
+  const L = enR.slice().reverse();
+  const tm = table([
+    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+    { h: 'Trabajador', f: m => esc(M.trab.find(t => t.id === m.trabajadorId)?.nombre || '—') },
+    { h: 'Detalle', f: m => m.tipo === 'pago' ? `${chip('good', 'Pago')}<span class="sub">${esc([m.medio, m.detalle].filter(Boolean).join(' · '))}</span>` : m.tipo === 'cargo' ? `${chip('', 'Extra')}<span class="sub">${esc(m.detalle)}</span>` : `${esc(m.detalle)}<span class="sub">${num(m.rastras)} rastras</span>` },
+    { h: 'Gana', r: 1, f: m => m.tipo !== 'pago' ? cop(m.valor) : '' },
+    { h: 'Pago', r: 1, f: m => m.tipo === 'pago' ? cop(m.valor) : '' },
+    { h: 'Saldo', r: 1, f: m => `<b class="${m.saldo < -0.5 ? 'pos' : ''}">${cop(m.saldo)}</b>` },
+  ], L, { act: m => editAttr(m.col, m.id), empty: `<p>No hay movimientos en este período${M.desdeN > R.to ? `; la nómina arranca el ${fmtDate(M.desdeN)}` : ''}.</p>` });
+
+  return `${head}${kp}<div class="clients">${cards}</div>${pendNote}
+    ${card('Semanas de pago', ts, { sub: `Cada fila va de domingo a sábado. La cuenta arrancó en cero el ${fmtDate(M.desdeN)}.` })}
+    ${card('Movimientos', tm, { sub: 'Del más reciente al más antiguo. El saldo es lo que le debes a ese trabajador después de cada movimiento. Toca una remisión para corregirla.', acts: addBtn('Pago', 'nomina-pago') })}`;
 };
 
 // Tabla de costo por rastra según el largo (pinera + mano de obra).
@@ -1263,7 +1491,7 @@ VIEW_FN.datos = () => {
   const claudeTxt = S.mode === 'gas'
     ? `Mándale a Claude por el chat fotos de remisiones o pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}. Claude deja los registros en la carpeta “Tablero Agrohermanos · entradas” de tu Drive y el tablero los carga solo la próxima vez que lo abras.`
     : `En el chat con Claude puedes mandar fotos de remisiones, pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}, o Excel con abonos. Claude los convierte en registros de este tablero y te dice qué cargó.`;
-  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos' };
+  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos', nomina: 'Nómina (pagos y extras)' };
   return `<div class="grid g-1-1">
     ${card('Dónde están tus datos', `<p style="color:var(--fg-2);margin-bottom:12px">${where}</p><div class="ledger">${counts.map(([c, k]) => `<div><span>${NOMBRES[c]}</span><b>${num(k, 0)}</b></div>`).join('')}</div>`)}
     <div class="stack">
@@ -1403,6 +1631,8 @@ const totalsBox = rows => `<div class="totals"><div class="ledger">${rows.map(([
 
 /* ---- definiciones ---- */
 const FORMS = {};
+// Tarifas de mano de obra vigentes al registrar el despacho (para la nómina).
+const moSnap = () => ({ aserrada: n(CFG().aserrada), arriada: n(CFG().arriada) });
 const commonNote = r => fld('f-nota', 'Nota', areaF('f-nota', r.nota, 'Opcional'), { full: true });
 
 FORMS['venta-mayorista'] = {
@@ -1430,7 +1660,7 @@ FORMS['venta-mayorista'] = {
     const tot = t.sub + fl, ut = tot - t.costo - cf;
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Subtotal piezas', cop(t.sub)], ['Total del pedido', cop(tot), 1], ['Costo real (pinera + mano de obra + flete)', cop(t.costo + cf)], ['Utilidad', `${signed(ut)} · ${pct(tot ? ut / tot : NaN)}`, 1]]);
   },
-  read: (f, r) => ({ ...r, canal: 'mayorista', estado: val(f, 'f-estado') || 'Entregado', fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), clienteId: val(f, 'f-cliente'), items: readLines(f, 'sale'), flete: parseMoney(val(f, 'f-flete')), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, mo: r.mo || moSnap(), canal: 'mayorista', estado: val(f, 'f-estado') || 'Entregado', fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), clienteId: val(f, 'f-cliente'), items: readLines(f, 'sale'), flete: parseMoney(val(f, 'f-flete')), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha del pedido.' : !d.clienteId ? 'Elige el cliente.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
 };
 
@@ -1467,7 +1697,7 @@ FORMS['venta-final'] = {
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Total del pedido', cop(tot), 1], ['Costo real', cop(t.costo + cf)], ['Utilidad', `${signed(ut)} · ${pct(tot ? ut / tot : NaN)}`], ['Pagado', cop(pag)], ['Saldo por cobrar', cop(Math.max(0, tot - pag)), 1]]);
   },
   read: (f, r) => ({
-    ...r, canal: 'final', fecha: val(f, 'f-fecha'), estado: val(f, 'f-estado'), clienteId: val(f, 'f-clifinal'),
+    ...r, mo: r.mo || moSnap(), canal: 'final', fecha: val(f, 'f-fecha'), estado: val(f, 'f-estado'), clienteId: val(f, 'f-clifinal'),
     cliente: { nombre: val(f, 'f-nombre'), celular: val(f, 'f-celular'), municipio: val(f, 'f-municipio'), direccion: val(f, 'f-direccion') },
     items: readLines(f, 'sale'), flete: parseMoney(val(f, 'f-flete')), costoFlete: parseMoney(val(f, 'f-costoFlete')),
     pagos: $$('[data-pago]', f).map(row => ({ fecha: row.querySelector('[data-k="fecha"]').value, valor: parseMoney(row.querySelector('[data-k="valor"]').value) })).filter(p => p.valor > 0),
@@ -1485,16 +1715,21 @@ const payForm = (o) => ({
       ${fld('f-valor', 'Valor', moneyF('f-valor', r.valor))}
       ${o.cliente ? fld('f-cliente', 'Cliente', selF('f-cliente', r.clienteId || model().mayoristas[0]?.id, model().mayoristas.map(c => [c.id, c.nombre])), { full: true }) : ''}
       ${fld('f-medio', 'Medio', selF('f-medio', r.medio || 'Transferencia', MEDIOS))}
+      ${o.extra ? o.extra(r) : ''}
       ${commonNote(r)}
     </div><div id="live"></div>`,
   live: form => o.live ? o.live(form) : '',
-  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), valor: parseMoney(val(f, 'f-valor')), medio: val(f, 'f-medio'), nota: val(f, 'f-nota'), ...(o.cliente ? { clienteId: val(f, 'f-cliente') } : {}) }),
+  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), valor: parseMoney(val(f, 'f-valor')), medio: val(f, 'f-medio'), nota: val(f, 'f-nota'), ...(o.cliente ? { clienteId: val(f, 'f-cliente') } : {}), ...(o.readExtra ? o.readExtra(f) : {}) }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !(d.valor > 0) ? 'Escribe el valor.' : (o.cliente && !d.clienteId) ? 'Elige el cliente.' : '',
 });
 FORMS['abono'] = payForm({
   col: 'abonos', eyebrow: 'Mayoristas', title: 'Abono de mayorista', cliente: true,
+  // Si el cliente le pagó por ti a la pinera o a un trabajador, baja su deuda y también lo que tú debes allá.
+  extra: r => fld('f-destino', '¿A quién le pagó?', selF('f-destino', r.destino || '', [['', 'A Agrohermanos'], ['pinera', 'Directo a la pinera'], ...model().trab.map(t => ['nomina:' + t.id, `Directo a ${t.nombre} (nómina)`])]), { full: true, hint: 'Si le pagó a la pinera o a un trabajador por ti, también baja lo que tú les debes.' }),
+  readExtra: f => ({ destino: val(f, 'f-destino') }),
   live: form => { const k = model().cartera.get(val(form, 'f-cliente')); return k ? `<div class="note">Saldo actual de ${esc(k.cliente.nombre)}: <b>${cop(k.saldo)}</b>${k.vencido > 0.5 ? ` · vencido ${cop(k.vencido)}` : ''}</div>` : ''; },
 });
+const destinoTxt = (a, M = model()) => a.destino === 'pinera' ? 'pagado a la pinera' : String(a.destino || '').startsWith('nomina:') ? `pagado a ${M.trab.find(t => 'nomina:' + t.id === a.destino)?.nombre || 'un trabajador'}` : '';
 FORMS['bb-pago'] = payForm({ col: 'bbPagos', eyebrow: 'Barro Blanco', title: 'Pago de Rubén', live: () => `<div class="note">${esc(CFG().socio)} te debe hoy <b>${cop(Math.max(0, model().bbSaldo))}</b>.</div>` });
 FORMS['pinera-pago'] = payForm({ col: 'pineraPagos', eyebrow: 'La Pinera', title: 'Pago a la pinera', live: () => `<div class="note">Saldo con la pinera hoy: <b>${cop(model().pineraSaldo)}</b>.</div>` });
 
@@ -1510,10 +1745,16 @@ FORMS['cliente'] = {
       ${fld('f-ciudad', 'Municipio', inp('f-ciudad', r.ciudad))}
       ${fld('f-dias', 'Días de crédito', inp('f-dias', r.diasCredito ?? '', { cls: 'qty', im: 'numeric', ph: '0' }), { hint: '0 = paga de contado al entregar' })}
       ${fld('f-lista', 'Lista de precios', selF('f-lista', r.listaId || '', [['', 'Sin lista (precio manual)'], ...L]), { full: true })}
+    </div>
+    <div class="form-sec"><h4>Saldo con el que arranca</h4></div>
+    <div class="form-grid">
+      ${fld('f-si', 'Valor', moneyF('f-si', Math.abs(n(r.saldoInicial))), { hint: 'Lo que debía antes de usar el tablero. Vacío si arranca en cero.' })}
+      ${fld('f-sitipo', 'Quién le debe a quién', selF('f-sitipo', n(r.saldoInicial) < 0 ? 'favor' : 'debe', [['debe', 'El cliente te debe'], ['favor', 'El cliente tiene plata a favor']]))}
+      ${fld('f-sifecha', 'Saldo a la fecha', dateF('f-sifecha', r.saldoInicialFecha))}
       ${commonNote(r)}
     </div>`;
   },
-  read: (f, r) => ({ ...r, tipo: 'mayorista', nombre: val(f, 'f-nombre'), contacto: val(f, 'f-contacto'), celular: val(f, 'f-celular'), ciudad: val(f, 'f-ciudad'), diasCredito: val(f, 'f-dias') === '' ? '' : parseQty(val(f, 'f-dias')), listaId: val(f, 'f-lista'), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, tipo: 'mayorista', nombre: val(f, 'f-nombre'), contacto: val(f, 'f-contacto'), celular: val(f, 'f-celular'), ciudad: val(f, 'f-ciudad'), diasCredito: val(f, 'f-dias') === '' ? '' : parseQty(val(f, 'f-dias')), listaId: val(f, 'f-lista'), saldoInicial: parseMoney(val(f, 'f-si')) * (val(f, 'f-sitipo') === 'favor' ? -1 : 1), saldoInicialFecha: val(f, 'f-sifecha'), nota: val(f, 'f-nota') }),
   validate: d => !d.nombre ? 'Escribe el nombre del cliente.' : '',
 };
 
@@ -1552,7 +1793,7 @@ const despForm = tipo => ({
     const t = liveSale(form, 'sale');
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Valor a precio de sociedad', cop(t.sub), 1], ['Tu costo real', cop(t.costo)], ['Ganas en el precio de sociedad', `${signed(t.sub - t.costo)} · ${pct(t.sub ? (t.sub - t.costo) / t.sub : NaN)}`]]);
   },
-  read: (f, r) => ({ ...r, tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'sale'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? {} : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'sale'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
 });
 FORMS['bb-despacho'] = despForm('despacho');
@@ -1727,6 +1968,107 @@ FORMS['ai'] = {
   },
 };
 
+/* ---- Pauta: campañas y cobro real del mes (se guardan en la configuración) ---- */
+const guardarCampanas = cs => Store.saveConfig({ pauta: { ...(S.config.pauta || {}), campanas: cs } });
+FORMS['campana'] = {
+  eyebrow: 'Pauta', title: 'Nueva campaña', cta: 'Guardar campaña', done: 'Campaña guardada',
+  init: () => ({ plataforma: PLATAFORMAS[0], presupuestoDiario: 30000, inicio: todayStr(), fin: '', reales: {} }),
+  body: r => `<div class="form-grid">
+      ${fld('f-nombre', 'Nombre de la campaña', inp('f-nombre', r.nombre, { ph: 'Campaña Meta · madera estructural' }), { full: true })}
+      ${fld('f-plataforma', 'Plataforma', selF('f-plataforma', r.plataforma || PLATAFORMAS[0], PLATAFORMAS))}
+      ${fld('f-diario', 'Presupuesto diario', moneyF('f-diario', r.presupuestoDiario))}
+      ${fld('f-inicio', 'Arrancó el', dateF('f-inicio', r.inicio))}
+      ${fld('f-fin', 'Terminó el', inp('f-fin', r.fin || '', { type: 'date' }), { hint: 'Déjalo vacío si sigue activa. Si la apagas, pon la fecha.' })}
+      ${commonNote(r)}
+    </div><div id="live"></div>`,
+  live: form => { const d = parseMoney(val(form, 'f-diario')); return d ? `<div class="note">${cop(d)} diarios son unos <b>${cop(d * 30)}</b> en un mes de 30 días.</div>` : ''; },
+  read: (f, r) => ({ ...r, id: r.id || uid(), nombre: val(f, 'f-nombre'), plataforma: val(f, 'f-plataforma'), presupuestoDiario: parseMoney(val(f, 'f-diario')), inicio: val(f, 'f-inicio'), fin: val(f, 'f-fin'), nota: val(f, 'f-nota'), reales: r.reales || {} }),
+  validate: d => !d.nombre ? 'Ponle un nombre a la campaña.' : !(d.presupuestoDiario > 0) ? 'Escribe el presupuesto diario.' : !isDate(d.inicio) ? 'Pon la fecha en que arrancó.' : isDate(d.fin) && d.fin < d.inicio ? 'La fecha en que terminó no puede ser antes de la de inicio.' : '',
+  save: d => guardarCampanas([...campanas(S.config).filter(c => c.id !== d.id), d]),
+  remove: r => guardarCampanas(campanas(S.config).filter(c => c.id !== r.id)),
+};
+FORMS['pauta-real'] = {
+  eyebrow: 'Pauta', title: 'Cobro real del mes', cta: 'Guardar cobro', done: 'Cobro guardado',
+  init: () => ({ mes: todayStr().slice(0, 7), campanaId: (campanas()[0] || {}).id || '' }),
+  body: r => {
+    const cs = campanas();
+    if (!cs.length) return `<div class="note">Primero crea la campaña en Pauta.</div>`;
+    const c0 = cs.find(c => c.id === r.campanaId) || cs[0];
+    const actual = tieneReal(c0, r.mes) ? c0.reales[r.mes] : '';
+    return `<div class="note">Lo que Meta te cobró en ese mes. Reemplaza el cálculo por presupuesto diario. Déjalo vacío para volver al cálculo.</div>
+    <div class="form-grid">
+      ${fld('f-camp', 'Campaña', selF('f-camp', c0.id, cs.map(c => [c.id, c.nombre])), { full: true })}
+      ${fld('f-mes', 'Mes', inp('f-mes', r.mes, { type: 'month', ph: 'AAAA-MM' }))}
+      ${fld('f-valor', 'Valor cobrado', moneyF('f-valor', r.valor ?? actual))}
+    </div><div id="live"></div>`;
+  },
+  live: form => {
+    const c = campanas().find(x => x.id === val(form, 'f-camp')), mes = val(form, 'f-mes');
+    if (!c || !/^\d{4}-\d{2}$/.test(mes)) return '';
+    const dias = diasActivosMes(c, mes, todayStr());
+    return `<div class="note">Por presupuesto serían <b>${cop(n(c.presupuestoDiario) * dias)}</b> (${dias} ${dias === 1 ? 'día activo' : 'días activos'} hasta hoy).${tieneReal(c, mes) ? ` Ahora tiene registrado ${cop(c.reales[mes])}.` : ''}</div>`;
+  },
+  read: f => ({ campanaId: val(f, 'f-camp'), mes: val(f, 'f-mes'), valor: parseMoney(val(f, 'f-valor')) }),
+  validate: d => !d.campanaId ? 'Elige la campaña.' : !/^\d{4}-\d{2}$/.test(d.mes) ? 'Elige el mes.' : '',
+  save: d => guardarCampanas(campanas(S.config).map(c => {
+    if (c.id !== d.campanaId) return c;
+    const reales = { ...(c.reales || {}) };
+    if (d.valor > 0) reales[d.mes] = d.valor; else delete reales[d.mes];
+    return { ...c, reales };
+  })),
+};
+
+/* ---- Nómina: pagos, trabajos extra y trabajadores ---- */
+const trabOpts = () => model().trab.map(t => [t.id, `${t.nombre} · ${oficioDe(t)}`]);
+const nominaForm = tipo => ({
+  col: 'nomina', eyebrow: 'Nómina', title: tipo === 'cargo' ? 'Trabajo extra' : 'Pago de nómina', cta: tipo === 'cargo' ? 'Guardar' : 'Guardar pago', done: tipo === 'cargo' ? 'Trabajo extra guardado' : 'Pago guardado',
+  init: () => ({ tipo, fecha: todayStr(), medio: 'Efectivo', trabajadorId: (model().trab[0] || {}).id }),
+  body: r => {
+    const ops = trabOpts();
+    if (!ops.length) return `<div class="note">Primero configura los trabajadores en Nómina.</div>`;
+    return `<div class="form-grid">
+      ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
+      ${fld('f-trab', 'Trabajador', selF('f-trab', r.trabajadorId || ops[0][0], ops))}
+      ${tipo === 'cargo' ? fld('f-concepto', '¿Qué hizo?', inp('f-concepto', r.concepto, { ph: 'Día de cargue, arreglo, bonificación…' }), { full: true }) : ''}
+      ${fld('f-valor', tipo === 'cargo' ? 'Valor a pagarle' : 'Valor pagado', moneyF('f-valor', r.valor))}
+      ${tipo === 'cargo' ? '' : fld('f-medio', 'Medio', selF('f-medio', r.medio || 'Efectivo', MEDIOS))}
+      ${commonNote(r)}
+    </div><div id="live"></div>`;
+  },
+  live: form => {
+    const M = model(), t = M.trab.find(x => x.id === val(form, 'f-trab'));
+    if (!t) return '';
+    const s1 = M.nominaSaldo.get(t.id) || 0;
+    return tipo === 'cargo'
+      ? `<div class="note">Esto no es por rastra, así que se suma a lo que le debes a ${esc(t.nombre)} y también a los gastos del período (sí se resta de la utilidad).</div>`
+      : `<div class="note">${s1 < -0.5 ? `${esc(t.nombre)} tiene un adelanto de <b>${cop(-s1)}</b>.` : `Hoy le debes a ${esc(t.nombre)} <b>${cop(s1)}</b>.`}${S.form && !S.form.isNew ? ' (Ya incluye este pago.)' : ''}</div>`;
+  },
+  read: (f, r) => ({ ...r, tipo, fecha: val(f, 'f-fecha'), trabajadorId: val(f, 'f-trab'), valor: parseMoney(val(f, 'f-valor')), nota: val(f, 'f-nota'), ...(tipo === 'cargo' ? { concepto: val(f, 'f-concepto') } : { medio: val(f, 'f-medio') }) }),
+  validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !d.trabajadorId ? 'Elige el trabajador.' : !(d.valor > 0) ? 'Escribe el valor.' : (tipo === 'cargo' && !d.concepto) ? 'Escribe qué trabajo hizo.' : '',
+});
+FORMS['nomina-pago'] = nominaForm('pago');
+FORMS['nomina-cargo'] = nominaForm('cargo');
+
+const trabRow = t => `<div class="pago trab" data-trab data-id="${esc(t.id || '')}"><input data-k="nombre" value="${esc(t.nombre || '')}" placeholder="Nombre" aria-label="Nombre del trabajador"><select data-k="concepto" aria-label="Qué hace">${OFICIOS.map(([v, l]) => `<option value="${v}"${(t.concepto || 'aserrada') === v ? ' selected' : ''}>${l}</option>`).join('')}</select><button type="button" class="icon-btn" data-act="rm-row" aria-label="Quitar trabajador">${icon('x')}</button></div>`;
+FORMS['nomina-config'] = {
+  eyebrow: 'Nómina', title: 'Trabajadores', cta: 'Guardar', done: 'Nómina guardada',
+  init: () => { const c = CFG().nomina || {}; return { desde: c.desde || todayStr(), trabajadores: Array.isArray(c.trabajadores) ? c.trabajadores : [] }; },
+  body: r => `<div class="note">Cada despacho desde la fecha de arranque suma sus rastras por la tarifa del oficio: aserrada ${cop(CFG().aserrada)} y arriada ${cop(CFG().arriada)} por rastra (se cambian en Precios y costos → Editar costos).</div>
+    <div class="form-grid">${fld('f-desde', 'La cuenta arranca en cero el', dateF('f-desde', r.desde), { full: true, hint: 'Los despachos de antes de esta fecha no suman: ese día no le debías nada a nadie.' })}</div>
+    <div class="form-sec"><h4>Trabajadores</h4></div>
+    <div class="pagos" id="trabs">${(r.trabajadores.length ? r.trabajadores : [{}]).filter(t => t.activo !== false).map(trabRow).join('')}</div>
+    <div>${btn(`${icon('plus')}Agregar trabajador`, 'data-act="add-trab"', 'sm')}</div>`,
+  read: (f, r) => {
+    const viejos = r.trabajadores || [];
+    const filas = $$('[data-trab]', f).map(row => ({ id: row.dataset.id || uid(), nombre: row.querySelector('[data-k="nombre"]').value.trim(), concepto: row.querySelector('[data-k="concepto"]').value })).filter(t => t.nombre);
+    // Los que se quitan quedan inactivos para no perder su historial.
+    const quitados = viejos.filter(t => !filas.some(x => x.id === t.id)).map(t => ({ ...t, activo: false }));
+    return { desde: val(f, 'f-desde'), trabajadores: [...filas, ...quitados] };
+  },
+  validate: d => !isDate(d.desde) ? 'Pon la fecha de arranque.' : !d.trabajadores.some(t => t.activo !== false) ? 'Agrega al menos un trabajador.' : '',
+  save: d => Store.saveConfig({ nomina: d }),
+};
+
 FORMS['pinera-compra'] = {
   col: 'pineraCompras', eyebrow: 'La Pinera', title: 'Compra o cargo de la pinera', cta: 'Guardar', done: 'Movimiento guardado',
   init: () => ({ fecha: todayStr(), concepto: 'Madera' }),
@@ -1853,6 +2195,7 @@ const EDIT_KIND = {
   ventas: r => r.canal === 'final' ? 'venta-final' : 'venta-mayorista', abonos: () => 'abono', clientes: r => r.tipo === 'final' ? 'cliente-final' : 'cliente',
   bbDespachos: r => r.tipo === 'devolucion' ? 'bb-devolucion' : 'bb-despacho', bbVentas: r => r.danada ? 'bb-danada' : 'bb-venta', bbPagos: () => 'bb-pago',
   pineraCompras: () => 'pinera-compra', pineraPagos: () => 'pinera-pago', gastos: () => 'gasto', listas: () => 'lista',
+  nomina: r => r.tipo === 'cargo' ? 'nomina-cargo' : 'nomina-pago',
 };
 
 function openForm(kind, rec, prefill, ai) {
@@ -1864,7 +2207,7 @@ function openForm(kind, rec, prefill, ai) {
   const title = rec ? `Editar ${base.charAt(0).toLowerCase()}${base.slice(1)}` : F.title;
   $('#form').innerHTML = `<header><div><div class="eyebrow">${F.eyebrow}${S.demo ? ' · ejemplo' : ''}</div><h2>${esc(title)}</h2></div><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">${icon('x')}</button></header>
     <div class="panel-b"><div class="form-err" id="form-err" hidden></div>${ai ? `<div class="note"><b>Claude llenó este formulario${ai.n > 1 ? ` (${ai.i} de ${ai.n})` : ''}.</b> Revisa los datos y guarda.${ai.nota ? ' ' + esc(ai.nota) : ''}</div>` : ''}${F.body(r)}</div>
-    <footer>${rec && F.col ? '<button type="button" class="btn danger" data-act="del">Eliminar</button>' : ''}<span class="sp"></span><button type="button" class="btn ghost" data-act="close">Cancelar</button><button type="submit" class="btn primary" id="f-submit">${rec ? 'Guardar cambios' : (F.cta || 'Guardar')}</button></footer>`;
+    <footer>${rec && (F.col || F.remove) ? '<button type="button" class="btn danger" data-act="del">Eliminar</button>' : ''}<span class="sp"></span><button type="button" class="btn ghost" data-act="close">Cancelar</button><button type="submit" class="btn primary" id="f-submit">${rec ? 'Guardar cambios' : (F.cta || 'Guardar')}</button></footer>`;
   $('#drawer').hidden = false;
   document.body.style.overflow = 'hidden';
   if (!rec) for (const row of $$('[data-line]', $('#form'))) autoPrice($('#form'), row);
@@ -1920,7 +2263,7 @@ async function armDelete(b) {
   const F = FORMS[S.form.kind], r = S.form.rec;
   if (F.col === 'clientes' && D().ventas.some(v => v.clienteId === r.id)) { formError('Este cliente tiene pedidos. Borra o cambia esos pedidos antes de eliminarlo.'); return; }
   b.disabled = true;
-  try { await Store.remove(F.col, r.id); closeForm(); toast('Eliminado'); }
+  try { if (F.remove) await F.remove(r); else await Store.remove(F.col, r.id); closeForm(); toast('Eliminado'); }
   catch (err) { formError(errMsg(err)); b.disabled = false; }
 }
 
@@ -2049,7 +2392,15 @@ function buildDemo() {
     if (rnd() < .15) gastos.push({ id: 'dg' + (i++), fecha: f, categoria: pick(['Flete', 'Cargue', 'Combustible', 'Comisiones']), descripcion: 'Gasto de ejemplo', valor: int(5, 40) * 10000, canal: 'General' });
   }
   ventas.push({ id: 'dv-pe', canal: 'mayorista', estado: 'Por entregar', clienteId: 'demo-c2', fecha: addDays(hoy, 13), remision: '', items: [{ unidad: 'pieza', medida: '4x8', largo: 6.5, cant: 60, precio: 275000, rastras: +(32 * 6.5 / 240).toFixed(6), costo: Math.round(piezaInfo('4x8', 6.5, DEFAULT_CONFIG).costo) }] });
-  return { listas, clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos };
+  // Nómina de ejemplo: cada sábado se paga lo que se cargó en la semana.
+  const nomina = [], desdeN = demoNomina().desde;
+  const cargados = [...ventas.filter(v => v.estado !== 'Por entregar' && v.estado !== 'Pendiente'), ...bbDespachos].filter(v => v.fecha >= desdeN);
+  for (let s = sabadoDe(desdeN); s < hoy; s = addDays(s, 7)) {
+    const ras = sum(cargados.filter(v => v.fecha >= addDays(s, -6) && v.fecha <= s), v => calcVenta(v).rastras);
+    if (ras) for (const [id, k] of [['demo-t1', 'aserrada'], ['demo-t2', 'arriada']]) nomina.push({ id: 'dn' + (i++), tipo: 'pago', trabajadorId: id, fecha: s, valor: Math.round(ras * DEFAULT_CONFIG[k] / 1000) * 1000, medio: 'Efectivo' });
+  }
+  nomina.push({ id: 'dn-x', tipo: 'cargo', trabajadorId: 'demo-t2', fecha: addDays(hoy, -9), concepto: 'Día de cargue (ejemplo)', valor: 60000 });
+  return { listas, clientes, ventas, abonos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina };
 }
 
 /* =========================================================================
@@ -2090,13 +2441,17 @@ document.addEventListener('click', e => {
     }
     case 'add-pago': $('#pagos').insertAdjacentHTML('beforeend', pagoRow({})); recalcForm(); break;
     case 'add-tramo': $('#tramos').insertAdjacentHTML('beforeend', tramoRow({})); break;
-    case 'rm-row': t.closest('[data-pago],[data-tramo]').remove(); recalcForm(); break;
+    case 'rm-row': t.closest('[data-pago],[data-tramo],[data-trab]').remove(); recalcForm(); break;
+    case 'add-trab': $('#trabs').insertAdjacentHTML('beforeend', trabRow({})); break;
+    case 'nomina-pagar': { const s1 = model().nominaSaldo.get(t.dataset.id) || 0; openForm('nomina-pago', null, { trabajadorId: t.dataset.id, valor: Math.max(0, Math.round(s1)) }); break; }
     case 'del': armDelete(t); break;
     case 'demo': S.demo = !S.demo; closeForm(); bump(); break;
     case 'cli': S.filterCli = S.filterCli === t.dataset.id ? '' : t.dataset.id; render(); break;
     case 'lista-ver': S.listaSel = t.dataset.id; render(); setTimeout(() => { const cs = $$('.card'); cs[cs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); break;
     case 'mx': S.matrixMode = t.dataset.m; render(); break;
     case 'cm': S.costMode = t.dataset.m; render(); break;
+    case 'campana-edit': { const c = campanas().find(x => x.id === t.dataset.id); if (c) openForm('campana', c); break; }
+    case 'pauta-mes': openForm('pauta-real', null, { mes: t.dataset.mes }); break;
     case 'export-json': exportJSON(); break;
     case 'export-csv': exportCSV(); break;
     case 'import': $('#import-file').click(); break;
