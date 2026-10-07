@@ -5,7 +5,11 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 const shell = readFileSync(new URL('./src/shell.html', import.meta.url), 'utf8');
 const app = readFileSync(new URL('./src/app.js', import.meta.url), 'utf8');
 if (!shell.includes('/*__APP__*/')) throw new Error('Falta el marcador /*__APP__*/ en src/shell.html');
-const out = shell.replace('/*__APP__*/', () => app.replace(/<\/script/gi, '<\\/script'));
+// Ícono de la pestaña: el isotipo de Agrohermanos.
+const iso = readFileSync(new URL('./src/isotipo.svg', import.meta.url), 'utf8');
+const icono = `<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,${Buffer.from(iso).toString('base64')}">`;
+const out = shell.replace('</title>', () => '</title>\n' + icono).replace('/*__APP__*/', () => app.replace(/<\/script/gi, '<\\/script'));
+if (!out.includes(icono)) throw new Error('Falta el <title> en src/shell.html');
 writeFileSync(new URL('./tablero.html', import.meta.url), out);
 const google = `<!doctype html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n</head>\n<body>\n${out}\n</body>\n</html>\n`;
 mkdirSync(new URL('./google/', import.meta.url), { recursive: true });

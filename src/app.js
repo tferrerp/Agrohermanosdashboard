@@ -165,7 +165,7 @@ function resumenDe(col, r) {
   try {
     switch (col) {
       case 'ventas': { const c = calcVenta(r); const quien = r.canal === 'final' ? (r.cliente?.nombre || 'Cliente final') : (S.data.clientes.find(x => x.id === r.clienteId)?.nombre || 'Mayorista'); return `${r.canal === 'final' ? 'Cliente final' : 'Mayorista'} · ${quien} · ${num(c.piezas, 0)} pzs · ${cop(c.total)}${r.estado ? ' · ' + r.estado : ''}`; }
-      case 'bbVentas': { const c = calcBB(r, S.config.pctSocio); return `${r.danada ? 'Piezas dañadas' : 'Venta en el punto'} ${cop(c.venta)} · te liquida ${cop(c.debe)}`; }
+      case 'bbVentas': { const c = calcBB(r, S.config.pctSocio); return `${r.danada ? 'Piezas dañadas' : r.origen === 'directo' ? 'Venta directa de la sociedad' : 'Venta en el punto'}${r.cliente ? ' · ' + r.cliente : ''} ${cop(c.venta)} · te liquida ${cop(c.debe)}${r.estado === 'Por entregar' ? ' · Por entregar' : ''}`; }
       case 'bbDespachos': { const c = calcVenta(r); return `${r.tipo === 'devolucion' ? 'Devolución' : 'Despacho'} · ${num(c.piezas, 0)} pzs · ${cop(c.sub)} a precio de sociedad`; }
       case 'pineraCompras': return `${r.concepto || 'Madera'}${n(r.rastras) ? ' · ' + num(r.rastras, 4) + ' rastras' : ''} · ${cop(r.valor)}`;
       case 'gastos': return `${r.categoria || 'Gasto'} · ${r.descripcion || ''} · ${cop(r.valor)}`;
@@ -403,6 +403,11 @@ function model() {
   }
   for (const v of d.bbVentas) {
     const c = calcBB(v, cfg.pctSocio);
+    // Venta de la sociedad ya cerrada pero sin entregar: no es venta todavía, pero ya cuenta como lo que deben.
+    if (v.estado === 'Por entregar') {
+      porEntregar.push({ id: v.id, col: 'bbVentas', fecha: v.fecha, canal: 'bb', cliente: `${cfg.punto}${v.cliente ? ' · ' + v.cliente : ''}`, ref: v, calc: { ...c, total: c.venta, pagado: 0, saldo: c.venta }, lines: c.lines });
+      continue;
+    }
     entries.push({ src: 'bbVentas', id: v.id, fecha: v.fecha, canal: 'bb', cliente: cfg.punto, ingreso: c.debe, costo: c.costo, util: c.miUtil, rastras: c.rastras, piezas: c.piezas, lines: c.lines, ref: v, calc: c });
   }
   entries.sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
@@ -411,8 +416,9 @@ function model() {
   const cartera = new Map();
   for (const c of mayoristas) {
     const dias = c.diasCredito === '' || c.diasCredito == null ? n(cfg.diasCredito) : n(c.diasCredito);
-    const pedidos = d.ventas.filter(v => v.canal === 'mayorista' && v.clienteId === c.id && v.estado !== 'Por entregar')
-      .map(v => ({ v, total: calcVenta(v).total, vence: addDays(v.fecha, dias) }))
+    // Un pedido confirmado ya es deuda del cliente (menos lo que haya abonado), aunque todavía no se entregue.
+    const pedidos = d.ventas.filter(v => v.canal === 'mayorista' && v.clienteId === c.id)
+      .map(v => ({ v, total: calcVenta(v).total, vence: addDays(v.fecha, dias), porEntregar: v.estado === 'Por entregar' }))
       .sort((a, b) => (a.v.fecha || '').localeCompare(b.v.fecha || ''));
     // Saldo con el que arrancó en el tablero: si te debía, cuenta como el pedido más viejo; si tenía plata a favor, como un abono.
     const si = n(c.saldoInicial);
@@ -422,13 +428,14 @@ function model() {
     let pool = sum(abonos, a => a.valor) + (si < -0.5 ? -si : 0);
     for (const p of pedidos) { const pay = Math.min(pool, p.total); p.pagado = pay; p.pend = p.total - pay; pool -= pay; }
     const pend = pedidos.filter(p => p.pend > 0.5);
-    const venc = pend.filter(p => p.vence < hoy);
+    const venc = pend.filter(p => p.vence < hoy && !p.porEntregar);
     cartera.set(c.id, {
       cliente: c, pedidos, abonos, dias,
       saldo: sum(pedidos, p => p.total) - sum(abonos, a => a.valor) + (si < -0.5 ? si : 0),
       vencido: sum(venc, p => p.pend),
       mora: venc.length ? Math.max(...venc.map(p => diffDays(p.vence, hoy))) : 0,
-      prox: pend.filter(p => p.vence >= hoy).map(p => p.vence).sort()[0] || '',
+      prox: pend.filter(p => p.vence >= hoy || p.porEntregar).map(p => p.vence).sort()[0] || '',
+      porEntregar: sum(pend.filter(p => p.porEntregar), p => p.pend),
       ultima: pedidos.length ? pedidos[pedidos.length - 1].v.fecha : '',
     });
   }
@@ -447,10 +454,12 @@ function model() {
     if (mv.tipo === 'devolucion') r.dev += n(l.cant);
     else { r.desp += n(l.cant); if ((mv.fecha || '') >= r.fechaPbb) { r.pbb = n(l.precio); r.fechaPbb = mv.fecha || ''; r.costo = n(l.costo); r.rastras = n(l.rastras); } }
   }
-  for (const v of d.bbVentas) for (const l of v.items || []) touch(l).vend += n(l.cant);
+  // Una venta con despacho directo sale de Agrohermanos, no del inventario del punto.
+  for (const v of d.bbVentas) if (v.origen !== 'directo') for (const l of v.items || []) touch(l).vend += n(l.cant);
   for (const r of inv.values()) { r.stock = r.desp - r.dev - r.vend; if (!r.pbb) r.pbb = listaPrecio(listaBB, r.medida, r.largo); }
   const bbEntries = entries.filter(e => e.canal === 'bb');
   const bbSaldo = sum(bbEntries, e => e.ingreso) - sum(d.bbPagos, p => p.valor);
+  const bbPorEntregar = sum(porEntregar.filter(p => p.canal === 'bb'), p => p.calc.debe);
 
   // La Pinera: estado de cuenta corrido.
   const ledger = [
@@ -470,6 +479,11 @@ function model() {
     if ((v.canal === 'mayorista' && v.estado === 'Por entregar') || (v.canal === 'final' && (v.estado || 'Pendiente') === 'Pendiente') || !isDate(v.fecha) || v.fecha < desdeN) continue;
     const c = calcVenta(v);
     if (c.rastras > 0) despachos.push({ fecha: v.fecha, col: 'ventas', ref: v, remision: v.remision || '', destino: v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista') : (cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final'), rastras: c.rastras });
+  }
+  for (const v of d.bbVentas) {
+    if (v.origen !== 'directo' || v.estado === 'Por entregar' || !isDate(v.fecha) || v.fecha < desdeN) continue;
+    const c = calcBB(v, cfg.pctSocio);
+    if (c.rastras > 0) despachos.push({ fecha: v.fecha, col: 'bbVentas', ref: v, remision: v.remision || '', destino: `${cfg.punto} (venta directa${v.cliente ? ': ' + v.cliente : ''})`, rastras: c.rastras });
   }
   for (const m of d.bbDespachos) {
     if (m.tipo === 'devolucion' || !isDate(m.fecha) || m.fecha < desdeN) continue;
@@ -504,7 +518,9 @@ function model() {
   }
   // Plata recibida de clientes finales por pedidos que no han salido (o sin pedido): se le debe al cliente hasta entregar.
   const anticiposFinal = sum(porEntregar.filter(p => p.canal === 'final'), p => Math.min(p.calc.pagado, p.calc.total)) + sum([...anticipoLibre.values()]);
-  const finalSaldo = sum(entries.filter(e => e.canal === 'final'), e => Math.max(0, e.calc.saldo));
+  // Lo que deben los clientes finales: pedidos despachados con saldo y pedidos confirmados menos su anticipo.
+  const finalPorEntregar = sum(porEntregar.filter(p => p.canal === 'final'), p => Math.max(0, p.calc.saldo));
+  const finalSaldo = sum(entries.filter(e => e.canal === 'final'), e => Math.max(0, e.calc.saldo)) + finalPorEntregar;
   const mayorSaldo = sum([...cartera.values()], c => Math.max(0, c.saldo));
   const mayorFavor = sum([...cartera.values()], c => Math.max(0, -c.saldo));
 
@@ -513,7 +529,7 @@ function model() {
   ].map(x => x.fecha).filter(isDate).sort();
 
   porEntregar.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, anticiposFinal, anticipoLibre, mayorSaldo, mayorFavor, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
+  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, bbPorEntregar, cli, mayoristas, finales, trab, nominaMovs, nominaSaldo, despachos, desdeN, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, finalPorEntregar, anticiposFinal, anticipoLibre, mayorSaldo, mayorFavor, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
   MODEL_KEY = key;
   return MODEL;
 }
@@ -768,7 +784,7 @@ function renderBanner() {
 
 const MENU = [
   ['Ventas', [['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final'], ['anticipo', 'Anticipo de cliente final']]],
-  ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta reportada por Rubén'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto']]],
+  ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta de la sociedad'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto']]],
   ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto'], ['campana', 'Campaña de pauta'], ['pauta-real', 'Cobro real de pauta del mes']]],
   ['Nómina', [['nomina-pago', 'Pago de nómina'], ['nomina-cargo', 'Trabajo extra']]],
   ['Configuración', [['cliente', 'Cliente mayorista'], ['cliente-final', 'Cliente final'], ['lista', 'Lista de precios']]],
@@ -837,7 +853,7 @@ function alertas(M) {
   for (const p of M.porEntregar) {
     const dd = diffDays(M.hoy, p.fecha);
     out.push([dd < 0 ? 'crit' : dd <= 7 ? 'warn' : 'info', `Entrega a ${p.cliente}: ${num(p.calc.piezas, 0)} pzs por ${cop(p.calc.total)}`,
-      dd < 0 ? `Estaba para el ${fmtDate(p.fecha)}. Márcalo como ${p.canal === 'final' ? 'despachado' : 'entregado'} cuando salga.` : dd === 0 ? 'La entrega es hoy.' : `Para el ${fmtDate(p.fecha)}, en ${dd} ${dd === 1 ? 'día' : 'días'}.`, p.canal === 'final' ? 'final' : 'mayoristas']);
+      dd < 0 ? `Estaba para el ${fmtDate(p.fecha)}. Márcalo como ${p.canal === 'final' ? 'despachado' : p.canal === 'bb' ? 'entregada' : 'entregado'} cuando salga.` : dd === 0 ? 'La entrega es hoy.' : `Para el ${fmtDate(p.fecha)}, en ${dd} ${dd === 1 ? 'día' : 'días'}.`, p.canal === 'final' ? 'final' : p.canal === 'bb' ? 'bb' : 'mayoristas']);
   }
   for (const c of M.cartera.values()) {
     if (c.vencido > 0.5) out.push(['crit', `${c.cliente.nombre} tiene ${cop(c.vencido)} vencido`, `Lleva ${c.mora} días de mora. Saldo total ${cop(c.saldo)}.`, 'mayoristas']);
@@ -874,29 +890,29 @@ function pendientes(M) {
   const PE = M.porEntregar;
   const tp = table([
     { h: 'Entrega', f: p => { const dd = diffDays(M.hoy, p.fecha); return `<span class="num">${fmtDate(p.fecha)}</span><span class="sub ${dd < 0 ? 'neg' : ''}">${dd < 0 ? `atrasado ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`}</span>`; } },
-    { h: 'Cliente', f: p => `<span class="cell-strong">${esc(p.cliente)}</span><span class="sub">${p.canal === 'final' ? 'Cliente final' : 'Mayorista'} · ${num(p.calc.piezas, 0)} pzs · ${num(p.calc.rastras)} rastras</span>` },
+    { h: 'Cliente', f: p => `<span class="cell-strong">${esc(p.cliente)}</span><span class="sub">${p.canal === 'final' ? 'Cliente final' : p.canal === 'bb' ? `Sociedad · te liquida ${cop(p.calc.debe, true)}` : 'Mayorista'} · ${num(p.calc.piezas, 0)} pzs · ${num(p.calc.rastras)} rastras</span>` },
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Anticipo', r: 1, f: p => p.calc.pagado > 0.5 ? cop(p.calc.pagado) : '<span class="muted">—</span>' },
     { h: 'Cobrar al entregar', r: 1, f: p => `<b>${cop(Math.max(0, p.calc.total - p.calc.pagado))}</b>` },
-  ], PE, { act: p => editAttr('ventas', p.id), empty: '<p class="muted">No hay pedidos por entregar.</p>',
+  ], PE, { act: p => editAttr(p.col || 'ventas', p.id), empty: '<p class="muted">No hay pedidos por entregar.</p>',
     foot: PE.length > 1 ? ['Total', '', cop(sum(PE, p => p.calc.total)), cop(sum(PE, p => p.calc.pagado)), cop(sum(PE, p => Math.max(0, p.calc.total - p.calc.pagado)))] : null });
 
   const fila = (label, sub, v, view) => `<div${view ? ` class="lk" data-act="nav" data-v="${view}" role="button" tabindex="0"` : ''}><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${cop(v)}</b></div>`;
   const deben = [], debes = [];
   for (const k of M.cartera.values()) {
-    if (k.saldo > 0.5) deben.push([k.cliente.nombre, k.vencido > 0.5 ? `Mayorista · ${cop(k.vencido)} vencido` : k.prox ? `Mayorista · vence el ${fmtDay(k.prox)}` : 'Mayorista', k.saldo, 'mayoristas']);
-    else if (k.saldo < -0.5) debes.push([k.cliente.nombre, 'Saldo a favor del mayorista', -k.saldo, 'mayoristas']);
+    if (k.saldo > 0.5) deben.push([k.cliente.nombre, ['Mayorista', k.vencido > 0.5 ? `${cop(k.vencido)} vencido` : '', k.porEntregar > 0.5 ? `${cop(k.porEntregar, true)} de pedido por entregar` : '', !k.vencido && !k.porEntregar && k.prox ? `vence el ${fmtDay(k.prox)}` : ''].filter(Boolean).join(' · '), k.saldo, 'mayoristas']);
+    else if (k.saldo < -0.5) debes.push([k.cliente.nombre, 'Saldo a favor del mayorista · se descuenta del próximo pedido', -k.saldo, 'mayoristas']);
   }
   if (M.bbSaldo > 0.5) deben.push([M.cfg.socio, `Ventas de ${M.cfg.punto}`, M.bbSaldo, 'bb']);
+  if (M.bbPorEntregar > 0.5) deben.push([M.cfg.socio, `Ventas de la sociedad por entregar · lo que te liquida`, M.bbPorEntregar, 'bb']);
   const finDeben = new Map();
-  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) { const r = finDeben.get(e.cliente) || [0, 0]; r[0] += e.calc.saldo; r[1]++; finDeben.set(e.cliente, r); }
-  for (const [nm, [v, k]] of finDeben) deben.push([nm, `Cliente final · ${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'}`, v, 'final']);
+  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) { const r = finDeben.get(e.cliente) || { v: 0, desp: 0, pend: 0, ant: 0 }; r.v += e.calc.saldo; r.desp++; finDeben.set(e.cliente, r); }
+  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.saldo > 0.5) { const r = finDeben.get(p.cliente) || { v: 0, desp: 0, pend: 0, ant: 0 }; r.v += p.calc.saldo; r.pend++; r.ant += p.calc.pagado; finDeben.set(p.cliente, r); }
+  for (const [nm, r] of finDeben) deben.push([nm, ['Cliente final', r.desp ? `${r.desp} ${r.desp === 1 ? 'pedido despachado' : 'pedidos despachados'}` : '', r.pend ? `${r.pend === 1 ? 'pedido' : r.pend + ' pedidos'} por entregar` : '', r.ant > 0.5 ? `ya dio ${cop(r.ant, true)} de anticipo` : ''].filter(Boolean).join(' · '), r.v, 'final']);
   if (M.pineraSaldo > 0.5) debes.push(['La pinera', 'Compra de madera', M.pineraSaldo, 'compras']);
   for (const t of M.trab) { const v = M.nominaSaldo.get(t.id) || 0; if (v > 0.5) debes.push([t.nombre, `Nómina · se paga el sábado ${fmtDay(sabadoDe(M.hoy))}`, v, 'nomina']); }
-  const antCli = new Map();
-  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.pagado > 0.5) antCli.set(p.cliente, (antCli.get(p.cliente) || 0) + Math.min(p.calc.pagado, p.calc.total));
-  for (const [cid, v] of M.anticipoLibre) { const nm = M.cli.get(cid)?.nombre || 'Cliente final'; antCli.set(nm, (antCli.get(nm) || 0) + v); }
-  for (const [nm, v] of antCli) debes.push([nm, 'Anticipo de cliente final · madera por entregar', v, 'final']);
+  // Un anticipo de un pedido no es plata que debas (debes la madera). Solo cuenta el que no tiene pedido.
+  for (const [cid, v] of M.anticipoLibre) debes.push([M.cli.get(cid)?.nombre || 'Cliente final', 'Anticipo sin pedido · se descuenta del próximo', v, 'final']);
   const bloque = (titulo, rows, vacio) => `<h4 class="ldg-h">${titulo}</h4><div class="ledger">${rows.length ? rows.sort((a, b) => b[2] - a[2]).map(r => fila(...r)).join('') + (rows.length > 1 ? `<div class="total"><span>Total</span><b>${cop(sum(rows, r => r[2]))}</b></div>` : '') : `<div><span class="muted">${vacio}</span><b></b></div>`}</div>`;
   const deudas = bloque('Te deben', deben, 'Nadie te debe.') + bloque('Tú debes', debes, 'No debes nada.');
   return `<div class="grid g-2-1">
@@ -910,7 +926,7 @@ VIEW_FN.resumen = R => {
   const Q = S.range === 'todo' ? null : periodo(M, prevRange(R));
   const invPzs = sum([...M.inv.values()], r => Math.max(0, r.stock));
   const invVal = sum([...M.inv.values()], r => Math.max(0, r.stock) * r.pbb);
-  const porCobrar = M.mayorSaldo + M.finalSaldo + Math.max(0, M.bbSaldo);
+  const porCobrar = M.mayorSaldo + M.finalSaldo + Math.max(0, M.bbSaldo) + M.bbPorEntregar;
   const margen = P.ingreso ? P.utilN / P.ingreso : NaN;
   const porRastra = P.rastras ? P.utilN / P.rastras : 0;
 
@@ -921,7 +937,7 @@ VIEW_FN.resumen = R => {
     ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas')}
   </div>`;
   const pos = `<div class="kpis soft">
-    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo), true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm' })}
+    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar, true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm' })}
     ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), Math.abs(M.pineraSaldo) < 0.5 ? 'Sin saldo' : M.pineraSaldo > 0 ? 'Le debes' : 'A tu favor', { cls: 'sm' })}
     ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `${cop(invVal)} a precio de sociedad`, { cls: 'sm' })}
     ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm' })}
@@ -975,7 +991,7 @@ function estadoChip(p, hoy) {
 VIEW_FN.mayoristas = R => {
   const M = model();
   const clientes = M.mayoristas.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
-  const head = `<div class="section-h"><p>Clientes que te compran al por mayor con crédito. Los abonos pagan primero los pedidos más viejos, así ves qué está vencido.</p>
+  const head = `<div class="section-h"><p>Clientes que te compran al por mayor con crédito. Un pedido confirmado ya es lo que te deben, aunque todavía no se entregue; los abonos pagan primero los pedidos más viejos, así ves qué está vencido.</p>
     <div class="acts">${addBtn('Pedido', 'venta-mayorista', 'primary sm')}${addBtn('Abono', 'abono')}${addBtn('Cliente', 'cliente')}</div></div>`;
   if (!clientes.length) return head + card('', emptyState('Agrega tus clientes mayoristas', 'Crea a Madera San Fermín y Madera San Nicolás con sus días de crédito y su lista de precios. Después registras pedidos y abonos.', addBtn('Cliente mayorista', 'cliente', '')));
 
@@ -1005,7 +1021,7 @@ VIEW_FN.mayoristas = R => {
     ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)' })}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
     ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`)}
-    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`)}
+    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${(x => x > 0.5 ? ` · ${cop(x)} de pedidos por entregar` : '')(sum(carSel, c => c.porEntregar))}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`)}
   </div>`;
   const ped = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
@@ -1033,7 +1049,7 @@ VIEW_FN.mayoristas = R => {
     { h: 'Rastras', r: 1, f: p => num(p.calc.rastras) },
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Utilidad esperada', r: 1, f: p => signed(p.calc.util) },
-  ], PE, { act: p => editAttr('ventas', p.id) }), { sub: 'Pedidos en producción. No cuentan como venta ni deuda hasta que los marques como entregados.' }) : '';
+  ], PE, { act: p => editAttr('ventas', p.id) }), { sub: 'Pedidos en producción. Ya cuentan como lo que te deben; cuentan como venta cuando los marques como entregados.' }) : '';
   return `${head}<div class="clients">${cards}</div>${peCard}${kp}
     ${card(sel ? `Pedidos de ${esc(M.cli.get(sel).nombre)}` : 'Pedidos', ped, { acts: sel ? btn('Ver todos', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') : '' })}
     <div class="grid g-1-1">
@@ -1046,9 +1062,19 @@ VIEW_FN.mayoristas = R => {
 VIEW_FN.bb = R => {
   const M = model(), cfg = M.cfg, p = n(cfg.pctSocio);
   const head = `<div class="section-h"><p>Sociedad con ${esc(cfg.socio)} en ${esc(cfg.punto)}. Le despachas a precio de sociedad; cuando vende, la utilidad sobre ese precio se reparte ${p}/${100 - p}. ${esc(cfg.socio)} te liquida el precio de sociedad más tu parte.</p>
-    <div class="acts">${S.sample ? btn(`${icon('spark')}Pegar mensaje de ${esc(cfg.socio)}`, 'data-act="form" data-form="ai"', 'sm') : ''}${addBtn('Venta reportada', 'bb-venta', 'primary sm')}${addBtn('Despacho', 'bb-despacho')}${addBtn('Pago', 'bb-pago')}${addBtn('Devolución', 'bb-devolucion')}</div></div>`;
+    <div class="acts">${S.sample ? btn(`${icon('spark')}Pegar mensaje de ${esc(cfg.socio)}`, 'data-act="form" data-form="ai"', 'sm') : ''}${addBtn('Venta', 'bb-venta', 'primary sm')}${addBtn('Despacho', 'bb-despacho')}${addBtn('Pago', 'bb-pago')}${addBtn('Devolución', 'bb-devolucion')}</div></div>`;
   const inv = [...M.inv.values()].filter(r => r.desp > 0 || r.vend > 0).sort((a, b) => (a.nombre).localeCompare(b.nombre, 'es', { numeric: true }));
-  if (!inv.length && !M.d.bbPagos.length) return head + card('', emptyState('Todavía no hay movimientos con Barro Blanco', `Registra el primer despacho con la relación de despacho: medidas, largos y cantidades. El precio de sociedad sale de la lista “${esc(M.listaBB ? M.listaBB.nombre : 'Sociedad Barro Blanco')}”.`, addBtn('Despacho al punto', 'bb-despacho', '')))
+  const PB = M.porEntregar.filter(p => p.canal === 'bb');
+  const pbCard = PB.length ? card('Ventas por entregar', table([
+    { h: 'Entrega', f: x => { const dd = diffDays(M.hoy, x.fecha); return `<span class="num">${fmtDate(x.fecha)}</span><span class="sub">${dd < 0 ? `atrasada ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`}</span>`; } },
+    { h: 'Cliente o proyecto', f: x => `<span class="cell-strong">${esc(x.ref.cliente || '—')}</span><span class="sub">${x.ref.origen === 'directo' ? 'Despacho directo desde Agrohermanos' : `Sale del inventario de ${esc(cfg.punto)}`}</span>` },
+    { h: 'Detalle', f: x => detalle(x.lines) },
+    { h: 'Venta', r: 1, f: x => cop(x.calc.venta) },
+    { h: 'Precio sociedad', r: 1, f: x => cop(x.calc.base) },
+    { h: 'Tu parte', r: 1, f: x => signed(x.calc.miParte) },
+    { h: 'Te liquida', r: 1, f: x => `<b>${cop(x.calc.debe)}</b>` },
+  ], PB, { act: x => editAttr('bbVentas', x.id) }), { sub: 'Ventas cerradas que todavía no se entregan. Ya cuentan como lo que te deben; cuentan como venta cuando las marques entregadas.' }) : '';
+  if (!inv.length && !M.d.bbPagos.length && !M.bbEntries.length) return head + pbCard + card('', emptyState('Todavía no hay movimientos con Barro Blanco', `Registra el primer despacho con la relación de despacho: medidas, largos y cantidades. El precio de sociedad sale de la lista “${esc(M.listaBB ? M.listaBB.nombre : 'Sociedad Barro Blanco')}”.`, addBtn('Despacho al punto', 'bb-despacho', '')))
     + card(`Inventario en ${esc(cfg.punto)}`, `<div class="inv-res"><div><span>Piezas</span><b>0</b></div><div><span>Rastras</span><b>0</b></div><div><span>Referencias</span><b>0</b></div><div><span>A precio de sociedad</span><b>$0</b></div><div><span>Tu costo</span><b>$0</b></div><div><span>Por acabarse</span><b>0</b></div></div><p class="muted">Cuando registres el primer despacho, aquí ves cada pieza que hay en el punto, lo vendido y lo que queda.</p>`, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido.' });
 
   const E = M.bbEntries.filter(e => inR(e.fecha, R));
@@ -1058,7 +1084,7 @@ VIEW_FN.bb = R => {
   const invPzs = sum(inv, r => Math.max(0, r.stock)), invVal = sum(inv, r => Math.max(0, r.stock) * r.pbb), invCost = sum(inv, r => Math.max(0, r.stock) * r.costo);
 
   const kp = `<div class="kpis">
-    ${kpi(`${esc(cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo)), M.bbSaldo < -0.5 ? `Tiene ${cop(-M.bbSaldo)} a favor` : 'Liquidaciones menos pagos recibidos', { dot: 'var(--s2)' })}
+    ${kpi(`${esc(cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar), [M.bbSaldo < -0.5 ? `Tiene ${cop(-M.bbSaldo)} a favor` : 'Liquidaciones menos pagos recibidos', M.bbPorEntregar > 0.5 ? `incluye ${cop(M.bbPorEntregar, true)} de ventas por entregar` : ''].filter(Boolean).join(' · '), { dot: 'var(--s2)' })}
     ${kpi('Vendido en el punto', cop(venta), `${num(ras)} rastras · ${E.length} reportes`)}
     ${kpi('Tu utilidad', signed(miU), `${cop(mi, true)} de tu ${p}% + margen sobre tu costo`)}
     ${kpi('Inventario en el punto', `${num(invPzs, 0)} pzs`, `${cop(invVal, true)} a precio sociedad · costo ${cop(invCost, true)}`)}
@@ -1099,7 +1125,7 @@ VIEW_FN.bb = R => {
 
   const vt = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
-    { h: 'Detalle', f: e => `${e.ref.danada ? chip('crit', 'Dañada', 'alert') + ' ' : ''}${detalle(e.lines)}` },
+    { h: 'Detalle', f: e => `${e.ref.danada ? chip('crit', 'Dañada', 'alert') + ' ' : ''}${e.ref.origen === 'directo' ? chip('wood', 'Directa') + ' ' : ''}${e.ref.cliente ? `<span class="cell-strong">${esc(e.ref.cliente)}</span>` : ''}${detalle(e.lines)}` },
     { h: 'Venta punto', r: 1, f: e => cop(e.calc.venta) },
     { h: 'Sobre lista', r: 1, f: e => { const L = e.lines.filter(l => n(l.plista)); if (!L.length) return '<span class="muted">—</span>'; const d = sum(L, l => l.cant * (n(l.precio) - n(l.plista))); return Math.abs(d) < 1 ? '<span class="muted">A lista</span>' : `<span class="${d < 0 ? 'neg' : 'pos'}">${d > 0 ? '+' : '−'}${cop(Math.abs(d))}</span>`; } },
     { h: 'Utilidad punto', r: 1, f: e => signed(e.calc.utilPunto) },
@@ -1123,7 +1149,7 @@ VIEW_FN.bb = R => {
     { h: 'Valor', r: 1, f: x => cop(x.valor) },
   ], P0, { act: x => editAttr('bbPagos', x.id), empty: '<p>No hay pagos en este período.</p>' });
 
-  return `${head}${kp}
+  return `${head}${kp}${pbCard}
     ${card(`Inventario en ${esc(cfg.punto)}`, invRes + invT, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido. El precio de sociedad es el del último despacho de cada pieza.', acts: addBtn('Despacho', 'bb-despacho') + addBtn('Devolución', 'bb-devolucion') })}
     <div class="grid g-1-1">
       ${card('Liquidación del período', liq, { sub: 'Cómo se reparte lo que se vendió en el rango elegido.' })}
@@ -1137,7 +1163,7 @@ VIEW_FN.bb = R => {
 const waLink = cel => { const d = String(cel || '').replace(/\D/g, ''); if (d.length < 7) return ''; const full = d.length === 10 ? '57' + d : d; return `<a href="https://wa.me/${full}" target="_blank" rel="noopener" class="chip good" style="text-decoration:none">WhatsApp</a>`; };
 VIEW_FN.final = R => {
   const M = model();
-  const head = `<div class="section-h"><p>Personas, constructoras y arquitectos que compran directo: a quién, a dónde se entrega, cuánto se cobró, cuánto dieron de anticipo y cuánto falta por pagar. Un pedido pendiente no cuenta como venta hasta que lo marques despachado.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}${addBtn('Anticipo', 'anticipo')}${addBtn('Cliente', 'cliente-final')}</div></div>`;
+  const head = `<div class="section-h"><p>Personas, constructoras y arquitectos que compran directo: a quién, a dónde se entrega, cuánto dieron de anticipo y cuánto falta por pagar. Un pedido confirmado ya es lo que te deben (menos el anticipo); cuenta como venta cuando lo marques despachado.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}${addBtn('Anticipo', 'anticipo')}${addBtn('Cliente', 'cliente-final')}</div></div>`;
   const all = M.entries.filter(e => e.canal === 'final');
   const pend = M.porEntregar.filter(p => p.canal === 'final');
 
@@ -1154,7 +1180,7 @@ VIEW_FN.final = R => {
   for (const p of pend) {
     const key = keyOf(p.ref), c = p.ref.cliente || {};
     const r = dir.get(key) || nuevo({ nombre: c.nombre || 'Sin nombre', celular: c.celular || '', municipio: c.municipio || '' });
-    r.pend++; r.anticipo += Math.min(p.calc.pagado, p.calc.total); dir.set(key, r);
+    r.pend++; r.anticipo += Math.min(p.calc.pagado, p.calc.total); r.saldo += Math.max(0, p.calc.saldo); dir.set(key, r);
   }
   const dt = table([
     { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${esc([r.empresa !== r.nombre ? r.empresa : '', r.oficio && r.oficio !== 'Persona' ? r.oficio : ''].filter(Boolean).join(' · '))}</span>` },
@@ -1179,7 +1205,7 @@ VIEW_FN.final = R => {
     ${kpi('Pedidos despachados', num(E.length, 0), `${num(sum(E, e => e.piezas), 0)} piezas · ${num(sum(E, e => e.rastras))} rastras`, { dot: 'var(--s3)' })}
     ${kpi('Ventas', cop(ing), `Ticket promedio ${cop(E.length ? ing / E.length : 0)}`)}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
-    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${(k => `${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'} con saldo`)(all.filter(e => e.calc.saldo > 0.5).length)}${M.anticiposFinal > 0.5 ? ` · ${cop(M.anticiposFinal, true)} en anticipos` : ''}`)}
+    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${M.finalPorEntregar > 0.5 ? `${cop(M.finalPorEntregar, true)} de pedidos por entregar` : `${(k => `${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'} con saldo`)(all.filter(e => e.calc.saldo > 0.5).length)}`}${M.anticiposFinal > 0.5 ? ` · ya restados ${cop(M.anticiposFinal, true)} de anticipos` : ''}`)}
   </div>`;
 
   const pc = pend.length ? card('Por entregar', table([
@@ -1191,7 +1217,7 @@ VIEW_FN.final = R => {
     { h: 'Cobrar al entregar', r: 1, f: p => `<b>${cop(Math.max(0, p.calc.saldo))}</b>` },
     { h: '', f: p => p.ref.clienteId ? btn(`${icon('plus')}Anticipo`, `data-act="form" data-form="anticipo" data-cli="${esc(p.ref.clienteId)}" data-pedido="${esc(p.id)}"`, 'sm') : '' },
   ], pend, { act: p => editAttr('ventas', p.id), foot: pend.length > 1 ? ['Total', '', '', cop(sum(pend, p => p.calc.total)), cop(sum(pend, p => p.calc.pagado)), cop(sum(pend, p => Math.max(0, p.calc.saldo))), ''] : null }),
-    { sub: 'Pedidos confirmados que todavía no salen. Cuando salgan, ábrelos y márcalos como despachados: ahí cuentan como venta y el saldo pasa a cobrar.' }) : '';
+    { sub: 'Pedidos confirmados que todavía no salen. Lo que falta después del anticipo ya es lo que te deben. Cuando salgan, ábrelos y márcalos como despachados: ahí cuentan como venta.' }) : '';
 
   const tone = { Pendiente: 'warn', Despachado: '', Entregado: 'good' };
   const t = table([
@@ -1922,13 +1948,16 @@ FORMS['bb-despacho'] = despForm('despacho');
 FORMS['bb-devolucion'] = despForm('devolucion');
 
 FORMS['bb-venta'] = {
-  foto: true, col: 'bbVentas', eyebrow: 'Barro Blanco', title: 'Venta reportada por Rubén', cta: 'Guardar venta', done: 'Venta guardada',
-  init: () => ({ fecha: todayStr(), items: [], pct: n(CFG().pctSocio) }),
+  foto: true, col: 'bbVentas', eyebrow: 'Barro Blanco', title: 'Venta de la sociedad', cta: 'Guardar venta', done: 'Venta guardada',
+  init: () => ({ fecha: todayStr(), items: [], pct: n(CFG().pctSocio), estado: 'Entregada', origen: 'punto' }),
   body: r => `<div class="form-grid">
-      ${fld('f-fecha', 'Fecha de la venta', dateF('f-fecha', r.fecha))}
+      ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha), { hint: 'Si está por entregar, pon el día de entrega.' })}
       ${fld('f-pct', 'Tu parte de la utilidad (%)', qtyF('f-pct', r.pct ?? CFG().pctSocio))}
+      ${fld('f-estado', 'Estado', selF('f-estado', r.estado || 'Entregada', [['Entregada', 'Entregada'], ['Por entregar', 'Vendida, por entregar']]))}
+      ${fld('f-origen', '¿De dónde sale la madera?', selF('f-origen', r.origen || 'punto', [['punto', `Del inventario de ${CFG().punto}`], ['directo', 'Despacho directo desde Agrohermanos']]), { hint: 'Directo no descuenta del inventario del punto y suma a la nómina cuando sale.' })}
+      ${fld('f-clientebb', 'Cliente o proyecto', inp('f-clientebb', r.cliente, { ph: 'Opcional: a quién se le vendió' }), { full: true })}
     </div>
-    <div class="note">Escribe lo que ${esc(CFG().socio)} vendió y a qué precio. El precio de sociedad sale del último despacho de esa pieza.</div>
+    <div class="note">Escribe lo que se vendió y a qué precio. El precio de sociedad sale del último despacho de esa pieza o, si no hay, de la lista de la sociedad.</div>
     ${linesBlock('bbv', r.items, 'Piezas vendidas')}
     <div class="form-grid">${commonNote(r)}</div><div id="live"></div>${datalistMedidas(model())}`,
   priceFor: (form, med, L) => listaPrecio(model().listaBBVenta, med, L),
@@ -1937,8 +1966,8 @@ FORMS['bb-venta'] = {
     const p = n(parseQty(val(form, 'f-pct')));
     return totalsBox([['Venta en el punto', cop(t.venta)], ['Precio de sociedad', cop(t.base)], ['Utilidad del punto', signed(t.up)], [`Tu parte (${num(p, 0)}%)`, signed(t.up * p / 100)], [`Parte de ${esc(CFG().socio)}`, signed(t.up * (100 - p) / 100)], [`${esc(CFG().socio)} te liquida`, cop(t.base + t.up * p / 100), 1], ['Tu costo real', cop(t.costo)], ['Tu utilidad real', signed(t.base + t.up * p / 100 - t.costo), 1]]);
   },
-  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), pct: parseQty(val(f, 'f-pct')), items: readLines(f, 'bbv'), nota: val(f, 'f-nota') }),
-  validate: d => !isDate(d.fecha) ? 'Pon la fecha de la venta.' : !d.items.length ? 'Agrega al menos una pieza vendida.' : d.items.some(l => !l.precio) ? 'Falta el precio de venta en alguna pieza.' : '',
+  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), pct: parseQty(val(f, 'f-pct')), estado: val(f, 'f-estado'), origen: val(f, 'f-origen'), cliente: val(f, 'f-clientebb'), ...(val(f, 'f-origen') === 'directo' ? { mo: r.mo || moSnap() } : {}), items: readLines(f, 'bbv'), nota: val(f, 'f-nota') }),
+  validate: d => !isDate(d.fecha) ? 'Pon la fecha de la venta.' : !d.items.length ? 'Agrega al menos una pieza vendida.' : d.items.some(l => !l.precio) ? 'Falta el precio de venta en alguna pieza.' : d.items.some(l => !l.pbb) ? 'Falta el precio de sociedad en alguna pieza.' : '',
 };
 
 FORMS['bb-danada'] = {

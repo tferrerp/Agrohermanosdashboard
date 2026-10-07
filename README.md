@@ -13,7 +13,7 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 |---|---|
 | Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; pedidos por entregar, deudas (te deben / debes), saldo con la pinera, inventario en Barro Blanco y alertas. |
 | Mayoristas | Pedidos y abonos por cliente. Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. Si un mayorista pagó de más, queda con *saldo a favor*. |
-| Barro Blanco | Inventario en el punto, despachos, devoluciones con su motivo (dañada, no se vendió…), ventas reportadas por Rubén (con la diferencia contra la lista), pagos y liquidación 50/50. |
+| Barro Blanco | Inventario en el punto, despachos, devoluciones con su motivo (dañada, no se vendió…), ventas de la sociedad (del punto o con despacho directo, entregadas o por entregar, con la diferencia contra la lista), pagos y liquidación 50/50. |
 | Cliente final | Directorio de clientes finales, pedidos por entregar y despachados, y anticipos con foto del comprobante. Un pedido pendiente no cuenta como venta hasta que se despacha. |
 | Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
 | Pauta | Gasto en publicidad de Meta por campaña, con interruptor de prendida/apagada y presupuesto mensual o diario. Solo suma los días que estuvo prendida (o el cobro real del mes). |
@@ -41,6 +41,7 @@ Las fotos de comprobantes se guardan con el registro: dentro de Claude como arch
 - **Costo real por rastra** = precio de la pinera según el largo + mano de obra (aserrada + arriada). Los valores reales se guardan en la configuración del tablero, no en el código.
 - **Costo real de una pieza** = rastras × costo real por rastra. Se guarda en cada venta, así que cambiar los costos no altera el historial.
 - **Barro Blanco**: utilidad del punto = venta − precio de sociedad. Tu parte = 50% de esa utilidad. Rubén te liquida el precio de sociedad + tu parte. Tu utilidad real = lo que te liquida − tu costo real.
+- **Lo que te deben**: un pedido confirmado ya es deuda del cliente por el total, menos lo que haya abonado o anticipado, aunque no se haya entregado. Cuenta como venta cuando se entrega.
 - **Utilidad neta** del período = Σ(venta − costo real) − gastos del período (gastos registrados + pauta + trabajos extra de nómina).
 - **Nómina**: cada despacho desde la fecha de arranque suma rastras × tarifa a cada trabajador. Esa plata ya está dentro del costo real, así que no se resta otra vez; solo los trabajos extra cuentan como gasto.
 - **Abono pagado a un tercero**: si un mayorista le paga directo a la pinera o a un trabajador, baja su deuda y también lo que se le debe a la pinera o al trabajador.

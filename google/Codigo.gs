@@ -13,6 +13,8 @@
 const SHEET_ID = '__SHEET_ID__';
 const HTML_URL = 'https://raw.githubusercontent.com/tferrerp/Agrohermanosdashboard/claude/agrohermanos-dashboard-z6gqsc/google/tablero-agrohermanos.html';
 const HTML_NAME = 'tablero-agrohermanos.html';
+// Ícono de la pestaña: el isotipo de Agrohermanos.
+const ICONO_URL = 'https://raw.githubusercontent.com/tferrerp/Agrohermanosdashboard/claude/agrohermanos-dashboard-z6gqsc/google/isotipo.png';
 const NOMBRE_HOJA = 'Tablero Agrohermanos · datos';
 const ENTRADAS = 'Tablero Agrohermanos · entradas';
 const PROCESADOS = 'Tablero Agrohermanos · entradas procesadas';
@@ -24,9 +26,11 @@ const RESERVADAS = ['config'];
 const ENCABEZADO = ['id', 'fecha', 'resumen', 'datos'];
 
 function doGet() {
-  return HtmlService.createHtmlOutput(ultimoHtml_())
+  const out = HtmlService.createHtmlOutput(ultimoHtml_())
     .setTitle('Tablero Agrohermanos')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, viewport-fit=cover');
+  try { out.setFaviconUrl(ICONO_URL); } catch (e) { /* sin ícono, el tablero igual abre */ }
+  return out;
 }
 
 // La versión más nueva del tablero: primero GitHub, si no, el archivo más reciente con ese nombre en tu Drive.
