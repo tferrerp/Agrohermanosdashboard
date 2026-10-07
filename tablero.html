@@ -529,6 +529,7 @@ const GASTO_CATS = ['Flete', 'Cargue', 'Combustible', 'Aserrío', 'Arriería', '
 const GASTO_CANAL = ['General', 'Mayoristas', 'Barro Blanco', 'Cliente final', 'Producción'];
 const PINERA_CONCEPTOS = ['Madera', 'Aserrío', 'Flete', 'Otro cargo'];
 const ESTADOS_FINAL = ['Pendiente', 'Despachado', 'Entregado'];
+const TIPOS_FINAL = ['Persona', 'Constructora', 'Arquitecto o constructor', 'Ferretería o depósito', 'Otro'];
 const CANAL = {
   mayorista: { label: 'Mayoristas', color: 'var(--s1)' },
   bb: { label: 'Barro Blanco', color: 'var(--s2)' },
@@ -751,6 +752,8 @@ function model() {
   const listaBB = listas.get(cfg.listaBB) || d.listas.find(x => /barro|sociedad/i.test(x.nombre || '') && !/venta/i.test(x.nombre || ''));
   const listaBBVenta = listas.get(cfg.listaBBVenta) || null;
   const cli = new Map(d.clientes.map(c => [c.id, c]));
+  const mayoristas = d.clientes.filter(c => c.tipo !== 'final');
+  const finales = d.clientes.filter(c => c.tipo === 'final').sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
 
   // Todas las ventas, en una sola lista con el ingreso que le queda a Agrohermanos.
   const entries = [], porEntregar = [];
@@ -760,7 +763,7 @@ function model() {
       porEntregar.push({ id: v.id, fecha: v.fecha, cliente: cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre', ref: v, calc: c, lines: c.lines });
       continue;
     }
-    const cliente = v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre') : (v.cliente?.nombre || 'Cliente final');
+    const cliente = v.canal === 'mayorista' ? (cli.get(v.clienteId)?.nombre || 'Mayorista sin nombre') : (cli.get(v.clienteId)?.nombre || v.cliente?.nombre || 'Cliente final');
     entries.push({ src: 'ventas', id: v.id, fecha: v.fecha, canal: v.canal === 'mayorista' ? 'mayorista' : 'final', cliente, ingreso: c.total, costo: c.costo, util: c.util, rastras: c.rastras, piezas: c.piezas, lines: c.lines, ref: v, calc: c });
   }
   for (const v of d.bbVentas) {
@@ -771,7 +774,7 @@ function model() {
 
   // Cartera de mayoristas: los abonos pagan primero los pedidos más viejos.
   const cartera = new Map();
-  for (const c of d.clientes) {
+  for (const c of mayoristas) {
     const dias = c.diasCredito === '' || c.diasCredito == null ? n(cfg.diasCredito) : n(c.diasCredito);
     const pedidos = d.ventas.filter(v => v.canal === 'mayorista' && v.clienteId === c.id && v.estado !== 'Por entregar')
       .map(v => ({ v, total: calcVenta(v).total, vence: addDays(v.fecha, dias) }))
@@ -826,7 +829,7 @@ function model() {
   ].map(x => x.fecha).filter(isDate).sort();
 
   porEntregar.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
-  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
+  MODEL = { d, cfg, hoy, listas, listaBB, listaBBVenta, porEntregar, cli, mayoristas, finales, entries, cartera, estadoPedido, inv, bbEntries, bbSaldo, ledger, pineraSaldo: run, finalSaldo, mayorSaldo, firstDate: allDates[0] || '', lastDate: allDates[allDates.length - 1] || '' };
   MODEL_KEY = key;
   return MODEL;
 }
@@ -1083,7 +1086,7 @@ const MENU = [
   ['Ventas', [['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final']]],
   ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta reportada por Rubén'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto'], ['bb-danada', 'Pieza dañada']]],
   ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto']]],
-  ['Configuración', [['cliente', 'Cliente mayorista'], ['lista', 'Lista de precios']]],
+  ['Configuración', [['cliente', 'Cliente mayorista'], ['cliente-final', 'Cliente final'], ['lista', 'Lista de precios']]],
 ];
 function renderMenu() {
   $('#menu').innerHTML = (S.sample ? `<h4>Claude</h4><button type="button" data-act="form" data-form="ai"><i style="background:var(--brand)"></i>Cargar mensaje o foto</button>` : '') + MENU.map(([g, items]) => `<h4>${g}</h4>${items.map(([f, l]) => `<button type="button" data-act="form" data-form="${f}"><i></i>${l}</button>`).join('')}`).join('');
@@ -1245,7 +1248,7 @@ function estadoChip(p, hoy) {
 }
 VIEW_FN.mayoristas = R => {
   const M = model();
-  const clientes = M.d.clientes.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
+  const clientes = M.mayoristas.slice().sort((a, b) => (a.nombre || '').localeCompare(b.nombre || ''));
   const head = `<div class="section-h"><p>Clientes que te compran al por mayor con crédito. Los abonos pagan primero los pedidos más viejos, así ves qué está vencido.</p>
     <div class="acts">${addBtn('Pedido', 'venta-mayorista', 'primary sm')}${addBtn('Abono', 'abono')}${addBtn('Cliente', 'cliente')}</div></div>`;
   if (!clientes.length) return head + card('', emptyState('Agrega tus clientes mayoristas', 'Crea a Madera San Fermín y Madera San Nicolás con sus días de crédito y su lista de precios. Después registras pedidos y abonos.', addBtn('Cliente mayorista', 'cliente', '')));
@@ -1402,9 +1405,35 @@ VIEW_FN.bb = R => {
 const waLink = cel => { const d = String(cel || '').replace(/\D/g, ''); if (d.length < 7) return ''; const full = d.length === 10 ? '57' + d : d; return `<a href="https://wa.me/${full}" target="_blank" rel="noopener" class="chip good" style="text-decoration:none">WhatsApp</a>`; };
 VIEW_FN.final = R => {
   const M = model();
-  const head = `<div class="section-h"><p>Pedidos de personas que compran directo: a quién, a dónde se entrega, cuánto se cobró y cuánto falta por pagar.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}</div></div>`;
+  const head = `<div class="section-h"><p>Personas, constructoras y arquitectos que compran directo: a quién, a dónde se entrega, cuánto se cobró y cuánto falta por pagar.</p><div class="acts">${addBtn('Pedido', 'venta-final', 'primary sm')}${addBtn('Cliente', 'cliente-final')}</div></div>`;
   const all = M.entries.filter(e => e.canal === 'final');
-  if (!all.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido con el nombre, celular y dirección de entrega. La utilidad se calcula con el costo real de cada pieza.', addBtn('Pedido de cliente final', 'venta-final', '')));
+
+  // Directorio: clientes guardados + los que solo aparecen en pedidos.
+  const dir = new Map();
+  for (const c of M.finales) dir.set('id:' + c.id, { id: c.id, nombre: c.nombre, empresa: c.empresa || '', oficio: c.oficio || '', celular: c.celular || '', municipio: c.municipio || '', n: 0, total: 0, saldo: 0, ultima: '' });
+  for (const e of all) {
+    const c = e.ref.cliente || {};
+    const key = e.ref.clienteId && dir.has('id:' + e.ref.clienteId) ? 'id:' + e.ref.clienteId : (String(c.celular || '').replace(/\D/g, '') || (c.nombre || '').toLowerCase());
+    const r = dir.get(key) || { nombre: c.nombre || 'Sin nombre', empresa: '', oficio: '', celular: c.celular || '', municipio: c.municipio || '', n: 0, total: 0, saldo: 0, ultima: '' };
+    r.n++; r.total += e.ingreso; r.saldo += Math.max(0, e.calc.saldo); if ((e.fecha || '') > r.ultima) r.ultima = e.fecha; dir.set(key, r);
+  }
+  const dt = table([
+    { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${esc([r.empresa, r.oficio && r.oficio !== 'Persona' ? r.oficio : ''].filter(Boolean).join(' · ') || r.municipio)}</span>` },
+    { h: 'Municipio', f: r => esc(r.municipio || '—') },
+    { h: 'Celular', f: r => `<span class="num">${esc(r.celular || '—')}</span>` },
+    { h: '', f: r => waLink(r.celular) },
+    { h: 'Pedidos', r: 1, f: r => num(r.n, 0) },
+    { h: 'Comprado', r: 1, f: r => cop(r.total) },
+    { h: 'Saldo', r: 1, f: r => r.saldo > 0.5 ? `<span class="neg">${cop(r.saldo)}</span>` : '<span class="muted">$0</span>' },
+    { h: 'Último', r: 1, f: r => r.ultima ? fmtDate(r.ultima) : '—' },
+  ], [...dir.values()].sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre)), {
+    act: r => r.id ? editAttr('clientes', r.id) : '',
+    empty: emptyState('Sin clientes finales', 'Guarda a tus clientes para elegirlos rápido al hacer un pedido.', addBtn('Cliente final', 'cliente-final', '')),
+  });
+  const dirCard = card('Directorio de clientes', dt, { sub: 'De mayor a menor compra. Toca un cliente guardado para editar sus datos.', acts: addBtn('Cliente', 'cliente-final') });
+
+  if (!all.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido: elige el cliente o escribe su nombre, celular y dirección. La utilidad se calcula con el costo real de cada pieza.', addBtn('Pedido de cliente final', 'venta-final', ''))) + dirCard;
+
   const E = all.filter(e => inR(e.fecha, R));
   const ing = sum(E, e => e.ingreso), ut = sum(E, e => e.util);
   const kp = `<div class="kpis">
@@ -1424,23 +1453,8 @@ VIEW_FN.final = R => {
     { h: 'Saldo', r: 1, f: e => e.calc.saldo > 0.5 ? `<span class="neg">${cop(e.calc.saldo)}</span>` : '<span class="muted">$0</span>' },
     { h: 'Estado', f: e => `<div class="pills">${chip(tone[e.ref.estado || 'Pendiente'], e.ref.estado || 'Pendiente')}${e.calc.saldo <= 0.5 ? chip('good', 'Pagado', 'check') : ''}</div>` },
   ], E, { act: e => editAttr('ventas', e.id), empty: '<p>No hay pedidos en este período.</p>' });
-  const dir = new Map();
-  for (const e of all) {
-    const c = e.ref.cliente || {};
-    const key = String(c.celular || '').replace(/\D/g, '') || (c.nombre || '').toLowerCase();
-    const r = dir.get(key) || { nombre: c.nombre || 'Sin nombre', celular: c.celular || '', municipio: c.municipio || '', n: 0, total: 0, ultima: '' };
-    r.n++; r.total += e.ingreso; if ((e.fecha || '') > r.ultima) r.ultima = e.fecha; dir.set(key, r);
-  }
-  const dt = table([
-    { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span><span class="sub">${esc(r.municipio)}</span>` },
-    { h: 'Celular', f: r => `<span class="num">${esc(r.celular || '—')}</span>` },
-    { h: '', f: r => waLink(r.celular) },
-    { h: 'Pedidos', r: 1, f: r => num(r.n, 0) },
-    { h: 'Comprado', r: 1, f: r => cop(r.total) },
-    { h: 'Último', r: 1, f: r => fmtDate(r.ultima) },
-  ], [...dir.values()].sort((a, b) => b.total - a.total));
   return `${head}${kp}${card('Pedidos', t)}
-    <div class="grid g-2-1">${card('Ventas y utilidad', trendLegend() + trendChart(R, E, [], { h: 200 }))}${card('Directorio de clientes', dt, { sub: 'Todos los clientes finales, de mayor a menor compra.' })}</div>`;
+    <div class="grid g-1-1">${card('Ventas y utilidad', trendLegend() + trendChart(R, E, [], { h: 200 }))}${dirCard}</div>`;
 };
 
 /* ---------- Compras y gastos (La Pinera + gastos) ---------- */
@@ -1776,7 +1790,7 @@ FORMS['venta-mayorista'] = {
   init: () => ({ canal: 'mayorista', fecha: todayStr(), items: [] }),
   body: r => {
     const M = model();
-    const cls = M.d.clientes.map(c => [c.id, c.nombre]);
+    const cls = M.mayoristas.map(c => [c.id, c.nombre]);
     return `<div class="form-grid">
       ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
       ${fld('f-remision', 'Remisión', inp('f-remision', r.remision, { ph: 'N.º de remisión' }))}
@@ -1805,9 +1819,11 @@ FORMS['venta-final'] = {
   init: () => ({ canal: 'final', fecha: todayStr(), estado: 'Pendiente', cliente: {}, items: [], pagos: [] }),
   body: r => {
     const c = r.cliente || {};
+    const fins = model().finales.map(x => [x.id, x.empresa ? `${x.nombre} · ${x.empresa}` : x.nombre]);
     return `<div class="form-grid">
       ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
       ${fld('f-estado', 'Estado de la entrega', selF('f-estado', r.estado || 'Pendiente', ESTADOS_FINAL))}
+      ${fins.length ? fld('f-clifinal', 'Cliente', selF('f-clifinal', r.clienteId || '', [['', 'Cliente nuevo (escribe sus datos)'], ...fins]), { full: true, hint: 'Elige un cliente guardado para llenar sus datos.' }) : ''}
       ${fld('f-nombre', 'Nombre del cliente', inp('f-nombre', c.nombre, { ph: 'Nombre y apellido' }))}
       ${fld('f-celular', 'Celular', inp('f-celular', c.celular, { ph: '300 000 0000', im: 'tel' }))}
       ${fld('f-municipio', 'Municipio', inp('f-municipio', c.municipio, { ph: 'Rionegro, Guarne…' }))}
@@ -1831,7 +1847,7 @@ FORMS['venta-final'] = {
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Total del pedido', cop(tot), 1], ['Costo real', cop(t.costo + cf)], ['Utilidad', `${signed(ut)} · ${pct(tot ? ut / tot : NaN)}`], ['Pagado', cop(pag)], ['Saldo por cobrar', cop(Math.max(0, tot - pag)), 1]]);
   },
   read: (f, r) => ({
-    ...r, canal: 'final', fecha: val(f, 'f-fecha'), estado: val(f, 'f-estado'),
+    ...r, canal: 'final', fecha: val(f, 'f-fecha'), estado: val(f, 'f-estado'), clienteId: val(f, 'f-clifinal'),
     cliente: { nombre: val(f, 'f-nombre'), celular: val(f, 'f-celular'), municipio: val(f, 'f-municipio'), direccion: val(f, 'f-direccion') },
     items: readLines(f, 'sale'), flete: parseMoney(val(f, 'f-flete')), costoFlete: parseMoney(val(f, 'f-costoFlete')),
     pagos: $$('[data-pago]', f).map(row => ({ fecha: row.querySelector('[data-k="fecha"]').value, valor: parseMoney(row.querySelector('[data-k="valor"]').value) })).filter(p => p.valor > 0),
@@ -1847,7 +1863,7 @@ const payForm = (o) => ({
   body: r => `<div class="form-grid">
       ${fld('f-fecha', 'Fecha', dateF('f-fecha', r.fecha))}
       ${fld('f-valor', 'Valor', moneyF('f-valor', r.valor))}
-      ${o.cliente ? fld('f-cliente', 'Cliente', selF('f-cliente', r.clienteId || model().d.clientes[0]?.id, model().d.clientes.map(c => [c.id, c.nombre])), { full: true }) : ''}
+      ${o.cliente ? fld('f-cliente', 'Cliente', selF('f-cliente', r.clienteId || model().mayoristas[0]?.id, model().mayoristas.map(c => [c.id, c.nombre])), { full: true }) : ''}
       ${fld('f-medio', 'Medio', selF('f-medio', r.medio || 'Transferencia', MEDIOS))}
       ${commonNote(r)}
     </div><div id="live"></div>`,
@@ -1878,6 +1894,22 @@ FORMS['cliente'] = {
     </div>`;
   },
   read: (f, r) => ({ ...r, tipo: 'mayorista', nombre: val(f, 'f-nombre'), contacto: val(f, 'f-contacto'), celular: val(f, 'f-celular'), ciudad: val(f, 'f-ciudad'), diasCredito: val(f, 'f-dias') === '' ? '' : parseQty(val(f, 'f-dias')), listaId: val(f, 'f-lista'), nota: val(f, 'f-nota') }),
+  validate: d => !d.nombre ? 'Escribe el nombre del cliente.' : '',
+};
+
+FORMS['cliente-final'] = {
+  col: 'clientes', eyebrow: 'Cliente final', title: 'Nuevo cliente final', cta: 'Guardar cliente', done: 'Cliente guardado',
+  init: () => ({ tipo: 'final', oficio: 'Persona' }),
+  body: r => `<div class="form-grid">
+      ${fld('f-nombre', 'Nombre', inp('f-nombre', r.nombre, { ph: 'Nombre y apellido' }), { full: true })}
+      ${fld('f-oficio', 'Tipo de cliente', selF('f-oficio', r.oficio || 'Persona', TIPOS_FINAL))}
+      ${fld('f-empresa', 'Empresa o constructora', inp('f-empresa', r.empresa, { ph: 'Opcional' }))}
+      ${fld('f-celular', 'Celular', inp('f-celular', r.celular, { ph: '300 000 0000', im: 'tel' }))}
+      ${fld('f-municipio', 'Municipio', inp('f-municipio', r.municipio, { ph: 'Rionegro, San Rafael…' }))}
+      ${fld('f-direccion', 'Dirección de entrega', inp('f-direccion', r.direccion, { ph: 'Vereda, finca, obra' }), { full: true })}
+      ${commonNote(r)}
+    </div>`,
+  read: (f, r) => ({ ...r, tipo: 'final', nombre: val(f, 'f-nombre'), oficio: val(f, 'f-oficio'), empresa: val(f, 'f-empresa'), celular: val(f, 'f-celular'), municipio: val(f, 'f-municipio'), direccion: val(f, 'f-direccion'), nota: val(f, 'f-nota') }),
   validate: d => !d.nombre ? 'Escribe el nombre del cliente.' : '',
 };
 
@@ -1953,7 +1985,8 @@ const AI_KINDS = ['bb-venta', 'bb-danada', 'bb-despacho', 'bb-pago', 'venta-mayo
 function aiPrompt(msg, hasImg) {
   const M = model(), cfg = M.cfg;
   const dias = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
-  const clientes = M.d.clientes.map(c => ({ id: c.id, nombre: c.nombre }));
+  const clientes = M.mayoristas.map(c => ({ id: c.id, nombre: c.nombre }));
+  const finales = M.finales.map(c => ({ id: c.id, nombre: c.nombre, empresa: c.empresa || '' }));
   return [
     'Eres el asistente del tablero de Agrohermanos, una empresa de madera estructural en Antioquia, Colombia, que maneja Tomás. Convierte el mensaje en registros para el tablero.',
     `Hoy es ${dias[toD(M.hoy).getUTCDay()]} ${M.hoy}. Escribe las fechas como AAAA-MM-DD. Si dicen "hoy", "ayer" o un día de la semana, calcula la fecha. Si no dicen fecha, usa hoy.`,
@@ -1967,12 +2000,13 @@ function aiPrompt(msg, hasImg) {
     `- "bb-pago": ${cfg.socio} le paga dinero a Agrohermanos. Campos: fecha, valor, medio.`,
     '- "venta-mayorista": pedido de un cliente mayorista. Campos: fecha, clienteId (de la lista de abajo), remision, estado ("Entregado" o "Por entregar"), items [{medida, largo, cant, precio}] (precio solo si lo dicen).',
     '- "abono": un cliente mayorista le paga a Agrohermanos. Campos: fecha, clienteId, valor, medio.',
-    '- "venta-final": pedido de una persona (cliente final). Campos: fecha, cliente {nombre, celular, municipio, direccion}, items [{medida, largo, cant, precio}], flete (domicilio cobrado).',
+    '- "venta-final": pedido de un cliente final (persona, constructora o arquitecto). Campos: fecha, clienteId (si es uno de los clientes finales de abajo), cliente {nombre, celular, municipio, direccion}, items [{medida, largo, cant, precio}], flete (domicilio cobrado).',
     '- "pinera-compra": madera comprada a la pinera o un cargo de la pinera. Campos: fecha, concepto ("Madera", "Aserrío", "Flete" u "Otro cargo"), remision, salida, destino, rastras, valor (total).',
     '- "pinera-pago": Agrohermanos le paga a la pinera. Campos: fecha, valor, medio.',
     `- "gasto": un gasto. Campos: fecha, categoria (${GASTO_CATS.join(', ')}), descripcion, valor.`,
     `medio es uno de: ${MEDIOS.join(', ')}.`,
     `Clientes mayoristas: ${JSON.stringify(clientes)}`,
+    `Clientes finales registrados: ${JSON.stringify(finales)}`,
     'Un mensaje puede traer varios registros. No inventes cantidades, precios ni fechas que no estén: deja vacío lo que falte y explícalo en "nota".',
     'Responde solo con JSON así: {"registros":[{"tipo":"bb-venta","fecha":"2026-10-07","items":[{"medida":"4x6","largo":4,"cant":3,"precio":120000}]}],"nota":""}',
     hasImg ? 'La imagen adjunta es parte del mensaje (foto de una remisión, pantallazo de WhatsApp o una nota).' : '',
@@ -2012,7 +2046,7 @@ function aiNormalize(out) {
       case 'bb-danada': pre = { ...base, items: aiItems(r.items, false) }; break;
       case 'bb-despacho': pre = { ...base, remision: String(r.remision || ''), items: aiItems(r.items, false) }; break;
       case 'venta-mayorista': pre = { ...base, clienteId: cliId(r.clienteId), remision: String(r.remision || ''), estado: oneOf(r.estado, ['Entregado', 'Por entregar'], 'Entregado'), items: aiItems(r.items, true) }; break;
-      case 'venta-final': pre = { ...base, cliente: { nombre: String(r.cliente?.nombre || ''), celular: String(r.cliente?.celular || ''), municipio: String(r.cliente?.municipio || ''), direccion: String(r.cliente?.direccion || '') }, items: aiItems(r.items, true), flete: money(r.flete) }; break;
+      case 'venta-final': { const fc = M.finales.find(c => c.id === r.clienteId); pre = { ...base, clienteId: fc ? fc.id : '', cliente: fc ? { nombre: fc.nombre || '', celular: fc.celular || '', municipio: fc.municipio || '', direccion: fc.direccion || '' } : { nombre: String(r.cliente?.nombre || ''), celular: String(r.cliente?.celular || ''), municipio: String(r.cliente?.municipio || ''), direccion: String(r.cliente?.direccion || '') }, items: aiItems(r.items, true), flete: money(r.flete) }; break; }
       case 'abono': pre = { ...base, clienteId: cliId(r.clienteId), valor: money(r.valor), medio: oneOf(r.medio, MEDIOS, 'Transferencia') }; break;
       case 'bb-pago': case 'pinera-pago': pre = { ...base, valor: money(r.valor), medio: oneOf(r.medio, MEDIOS, 'Transferencia') }; break;
       case 'pinera-compra': pre = { ...base, concepto: oneOf(r.concepto, PINERA_CONCEPTOS, 'Madera'), remision: String(r.remision || ''), salida: String(r.salida || ''), destino: String(r.destino || ''), rastras: parseLoose(r.rastras), valor: money(r.valor) }; break;
@@ -2196,7 +2230,7 @@ FORMS['costos'] = {
 };
 
 const EDIT_KIND = {
-  ventas: r => r.canal === 'final' ? 'venta-final' : 'venta-mayorista', abonos: () => 'abono', clientes: () => 'cliente',
+  ventas: r => r.canal === 'final' ? 'venta-final' : 'venta-mayorista', abonos: () => 'abono', clientes: r => r.tipo === 'final' ? 'cliente-final' : 'cliente',
   bbDespachos: r => r.tipo === 'devolucion' ? 'bb-devolucion' : 'bb-despacho', bbVentas: r => r.danada ? 'bb-danada' : 'bb-venta', bbPagos: () => 'bb-pago',
   pineraCompras: () => 'pinera-compra', pineraPagos: () => 'pinera-pago', gastos: () => 'gasto', listas: () => 'lista',
 };
@@ -2473,6 +2507,10 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (t.id === 'import-file' && t.files && t.files[0]) { handleImportFile(t.files[0]); t.value = ''; return; }
+  if (S.form && t.id === 'f-clifinal') {
+    const c = model().cli.get(t.value);
+    if (c) for (const [id, k] of [['f-nombre', 'nombre'], ['f-celular', 'celular'], ['f-municipio', 'municipio'], ['f-direccion', 'direccion']]) { const el = $('#' + id); if (el) el.value = c[k] || ''; }
+  }
   if (S.form && t.id === 'f-cliente') { for (const row of $$('[data-line]', $('#form'))) autoPrice($('#form'), row); recalcForm(); }
   if (S.form) recalcForm();
 });

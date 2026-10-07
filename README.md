@@ -14,7 +14,7 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 | Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; por cobrar, saldo con la pinera, inventario en Barro Blanco y alertas. |
 | Mayoristas | Pedidos y abonos por cliente (San Fermín, San Nicolás). Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. |
 | Barro Blanco | Despachos, ventas reportadas por Rubén, pagos, piezas dañadas (las asume la sociedad), inventario en el punto y liquidación 50/50. |
-| Cliente final | Pedidos con nombre, celular, dirección, pagos y saldo. |
+| Cliente final | Directorio de clientes finales (personas, constructoras, arquitectos) y sus pedidos con dirección, pagos y saldo. |
 | Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
 | Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
