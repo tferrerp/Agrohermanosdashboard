@@ -105,7 +105,7 @@ const CANAL = {
 };
 
 const VIEWS = [
-  { id: 'resumen', label: 'Resumen', icon: 'resumen', group: 'Negocio' },
+  { id: 'resumen', label: 'Home', icon: 'resumen', group: 'Negocio' },
   { id: 'remisiones', label: 'Remisiones', icon: 'remision', group: 'Ventas' },
   { id: 'mayoristas', label: 'Mayoristas', icon: 'mayoristas', group: 'Ventas' },
   { id: 'bb', label: 'Barro Blanco', icon: 'bb', group: 'Ventas' },

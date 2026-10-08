@@ -12,7 +12,7 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 | Sección | Qué hace |
 |---|---|
 | Remisiones | Cada cargue que sale: se sube la foto de la remisión, Claude saca el despiece, se confirma y se elige para quién es (un destino o repartido entre Barro Blanco, mayoristas, clientes finales o pedidos por entregar). Crea las ventas y despachos y suma la nómina del viaje. |
-| Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; pedidos por entregar, deudas (te deben / debes), saldo con la pinera, inventario en Barro Blanco y alertas. |
+| Home | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; pedidos por entregar, deudas (te deben / debes), saldo con la pinera, inventario en Barro Blanco y alertas. |
 | Mayoristas | Pedidos y abonos por cliente. Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. Si un mayorista pagó de más, queda con *saldo a favor*. |
 | Barro Blanco | Inventario en el punto, despachos, devoluciones con su motivo (dañada, no se vendió…), ventas de la sociedad (del punto o con despacho directo, entregadas o por entregar, con la diferencia contra la lista), pagos y liquidación 50/50. |
 | Cliente final | Directorio de clientes finales, pedidos por entregar y despachados, y anticipos con foto del comprobante. Un pedido pendiente no cuenta como venta hasta que se despacha. |
