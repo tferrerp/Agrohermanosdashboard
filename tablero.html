@@ -6,7 +6,7 @@
 <style>
 /* Layout: a fixed rail of business areas on the left, a work area on the right; one filter row on top scopes every number below it. */
 :root {
-  /* Marca Agrohermanos: naranja #E06A12 y verde #25372B sobre blanco (día) o negro (noche). */
+  /* Colores aprobados del manual de marca: verde #25372B y naranja #D46A1F. Fondo blanco (día) o negro (noche). */
   --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface-2: #FAFAFA;
@@ -16,29 +16,37 @@
   --fg: #111311;
   --fg-2: #454A46;
   --muted: #7A7F7B;
-  --accent: #D2590A;
-  --accent-tx: #B84E08;
+  --accent: #D46A1F;
+  --accent-tx: #B4561A;
   --accent-ink: #FFFFFF;
-  --accent-soft: #FFF1E6;
-  --brand: #E8650F;
-  --brand-soft: #FFF1E6;
-  --green: #1F6B43;
-  --green-soft: #E7F3EB;
+  --accent-soft: #FBEDE3;
+  --brand: #D46A1F;
+  --brand-soft: #FBEDE3;
+  --green: #25372B;
+  --green-soft: #E5EBE6;
+  --label: #25372B;
   --logo-a: #25372B;
-  --logo-b: #E8650F;
+  --logo-b: #D46A1F;
   --logo-cut: #FFFFFF;
-  --s1: #1B7046;
-  --s2: #E8650F;
+  --rail-bg: #FFFFFF;
+  --rail-line: #EBEBEB;
+  --rail-fg: #111311;
+  --rail-fg-2: #454A46;
+  --rail-muted: #25372B;
+  --rail-hover: #F3F3F3;
+  --rail-active: #FBEDE3;
+  --s1: #25372B;
+  --s2: #D46A1F;
   --s3: #4A6FC0;
-  --good: #1D7A3F;
-  --good-soft: #E5F3E9;
+  --good: #25372B;
+  --good-soft: #E5EBE6;
   --warn: #9A5F0E;
   --warn-soft: #FDF1DE;
   --crit: #C0322F;
   --crit-soft: #FDE7E6;
   --scrim: rgba(10, 10, 10, .42);
   --shadow: 0 1px 2px rgba(0, 0, 0, .04), 0 12px 32px -20px rgba(0, 0, 0, .22);
-  --glow: 0 2px 6px rgba(0, 0, 0, .04), 0 18px 40px -18px rgba(232, 101, 15, .45);
+  --glow: 0 2px 6px rgba(0, 0, 0, .04), 0 18px 40px -18px rgba(212, 106, 31, .5);
   --f-ui: "Archivo", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   --r: 14px;
@@ -48,15 +56,17 @@
     --bg: #000000; --surface: #0B0B0B; --surface-2: #060606; --sunken: #161616;
     --line: #1F1F1F; --line-strong: #2F2F2F;
     --fg: #F5F5F5; --fg-2: #C4C4C4; --muted: #8C8C8C;
-    --accent: #FF7A1A; --accent-tx: #FF8B33; --accent-ink: #0A0A0A; --accent-soft: #24140A;
-    --brand: #FF7A1A; --brand-soft: #24140A;
-    --green: #3FA068; --green-soft: #0E2116;
-    --logo-a: #3FA068; --logo-b: #FF7A1A; --logo-cut: #000000;
-    --s1: #3FA068; --s2: #FF7A1A; --s3: #6A8FE0;
-    --good: #4DBE73; --good-soft: #0E2116; --warn: #F2B13D; --warn-soft: #261C0B; --crit: #FF6B63; --crit-soft: #2A1110;
+    --accent: #D46A1F; --accent-tx: #D46A1F; --accent-ink: #FFFFFF; --accent-soft: #2A170A;
+    --brand: #D46A1F; --brand-soft: #2A170A;
+    --green: #25372B; --green-soft: #25372B; --label: #8C8C8C;
+    /* De noche el verde de la marca va de fondo (barra lateral, etiquetas) y el logo usa su versión blanca sobre verde. */
+    --logo-a: #FFFFFF; --logo-b: #D46A1F; --logo-cut: #25372B;
+    --rail-bg: #25372B; --rail-line: #25372B; --rail-fg: #FFFFFF; --rail-fg-2: rgba(255, 255, 255, .8); --rail-muted: rgba(255, 255, 255, .55); --rail-hover: rgba(255, 255, 255, .08); --rail-active: rgba(255, 255, 255, .12);
+    --s1: #F2F2F2; --s2: #D46A1F; --s3: #6A8FE0;
+    --good: #FFFFFF; --good-soft: #25372B; --warn: #F2B13D; --warn-soft: #261C0B; --crit: #FF6B63; --crit-soft: #2A1110;
     --scrim: rgba(0, 0, 0, .7);
     --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 44px -22px rgba(0, 0, 0, .9);
-    --glow: 0 0 0 1px rgba(255, 122, 26, .35), 0 18px 44px -20px rgba(255, 122, 26, .45);
+    --glow: 0 0 0 1px rgba(212, 106, 31, .45), 0 18px 44px -20px rgba(212, 106, 31, .5);
     color-scheme: dark;
   }
 }
@@ -64,15 +74,17 @@
   --bg: #000000; --surface: #0B0B0B; --surface-2: #060606; --sunken: #161616;
   --line: #1F1F1F; --line-strong: #2F2F2F;
   --fg: #F5F5F5; --fg-2: #C4C4C4; --muted: #8C8C8C;
-  --accent: #FF7A1A; --accent-tx: #FF8B33; --accent-ink: #0A0A0A; --accent-soft: #24140A;
-  --brand: #FF7A1A; --brand-soft: #24140A;
-  --green: #3FA068; --green-soft: #0E2116;
-  --logo-a: #3FA068; --logo-b: #FF7A1A; --logo-cut: #000000;
-  --s1: #3FA068; --s2: #FF7A1A; --s3: #6A8FE0;
-  --good: #4DBE73; --good-soft: #0E2116; --warn: #F2B13D; --warn-soft: #261C0B; --crit: #FF6B63; --crit-soft: #2A1110;
+  --accent: #D46A1F; --accent-tx: #D46A1F; --accent-ink: #FFFFFF; --accent-soft: #2A170A;
+  --brand: #D46A1F; --brand-soft: #2A170A;
+  --green: #25372B; --green-soft: #25372B; --label: #8C8C8C;
+  /* De noche el verde de la marca va de fondo (barra lateral, etiquetas) y el logo usa su versión blanca sobre verde. */
+  --logo-a: #FFFFFF; --logo-b: #D46A1F; --logo-cut: #25372B;
+  --rail-bg: #25372B; --rail-line: #25372B; --rail-fg: #FFFFFF; --rail-fg-2: rgba(255, 255, 255, .8); --rail-muted: rgba(255, 255, 255, .55); --rail-hover: rgba(255, 255, 255, .08); --rail-active: rgba(255, 255, 255, .12);
+  --s1: #F2F2F2; --s2: #D46A1F; --s3: #6A8FE0;
+  --good: #FFFFFF; --good-soft: #25372B; --warn: #F2B13D; --warn-soft: #261C0B; --crit: #FF6B63; --crit-soft: #2A1110;
   --scrim: rgba(0, 0, 0, .7);
   --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 18px 44px -22px rgba(0, 0, 0, .9);
-  --glow: 0 0 0 1px rgba(255, 122, 26, .35), 0 18px 44px -20px rgba(255, 122, 26, .45);
+  --glow: 0 0 0 1px rgba(212, 106, 31, .45), 0 18px 44px -20px rgba(212, 106, 31, .5);
   color-scheme: dark;
 }
 
@@ -95,33 +107,35 @@ p { margin: 0; }
 .pos { color: var(--good); }
 
 /* ---------- shell ---------- */
-.app { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100vh; background: linear-gradient(90deg, var(--bg) 0 227px, var(--line) 227px 228px, transparent 228px); }
+.app { display: grid; grid-template-columns: 228px minmax(0, 1fr); min-height: 100vh; background: linear-gradient(90deg, var(--rail-bg) 0 227px, var(--rail-line) 227px 228px, transparent 228px); }
 .rail {
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
   display: flex; flex-direction: column; gap: 28px;
-  padding: 22px 14px 18px; background: var(--bg); border-right: 1px solid var(--line);
+  padding: 22px 14px 18px; background: var(--rail-bg); border-right: 1px solid var(--rail-line); color: var(--rail-fg-2);
 }
 .brand { display: flex; align-items: center; padding: 2px 6px 0; }
 /* Logo del manual de marca, sin fondo: verde y naranja cambian con el tema. */
 .brand .logo { display: block; width: 100%; max-width: 196px; height: auto; flex: none; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
-.nav-g { font-family: var(--f-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--green); padding: 14px 10px 6px; }
+.nav-g { font-family: var(--f-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--rail-muted); padding: 14px 10px 6px; }
 .nav button {
   display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; cursor: pointer;
-  color: var(--fg-2); font-weight: 500; text-align: left;
+  color: var(--rail-fg-2); font-weight: 500; text-align: left;
 }
 .nav button svg { width: 16px; height: 16px; flex: none; opacity: .8; }
 .nav button { transition: background .15s, color .15s, box-shadow .15s; }
-.nav button:hover { background: var(--sunken); color: var(--fg); }
+.nav button:hover { background: var(--rail-hover); color: var(--rail-fg); }
 .nav button:hover svg { color: var(--brand); opacity: 1; }
-.nav button[aria-current="page"] { background: var(--accent-soft); color: var(--fg); font-weight: 600; box-shadow: inset 3px 0 0 var(--brand); }
+.nav button[aria-current="page"] { background: var(--rail-active); color: var(--rail-fg); font-weight: 600; box-shadow: inset 3px 0 0 var(--brand); }
 .nav button[aria-current="page"] svg { color: var(--brand); opacity: 1; }
 .nav .badge { margin-left: auto; font-family: var(--f-mono); font-size: 10.5px; padding: 1px 6px; border-radius: 99px; background: var(--crit-soft); color: var(--crit); }
-.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 8px; font-size: 12px; color: var(--muted); }
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding: 0 8px; font-size: 12px; color: var(--rail-fg-2); }
+.rail-foot .btn { color: inherit; }
+.rail-foot .btn:hover { background: var(--rail-hover); color: var(--rail-fg); }
 .sync { display: flex; align-items: center; gap: 8px; font-family: var(--f-mono); font-size: 11px; }
 .sync i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); }
-.sync.on i { background: var(--good); box-shadow: 0 0 0 3px var(--good-soft); }
+.sync.on i { background: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 25%, transparent); }
 .sync.local i { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-soft); }
 
 .main { min-width: 0; padding-inline: clamp(16px, 3.2vw, 40px); padding-block: 0 64px; }
@@ -133,7 +147,7 @@ p { margin: 0; }
   border-bottom: 1px solid var(--line); margin-bottom: 22px;
 }
 .top-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--green); }
+.eyebrow { font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--label); }
 .top h1 { font-size: 26px; font-weight: 650; letter-spacing: -.01em; font-variation-settings: "wdth" 112; margin-top: 4px; }
 .top h1::after { content: ""; display: inline-block; width: 9px; height: 9px; margin-left: 9px; border-radius: 2px; background: var(--brand); vertical-align: .12em; }
 .top-actions { display: flex; gap: 8px; align-items: center; position: relative; }
@@ -293,8 +307,8 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .switch { display: inline-flex; align-items: center; gap: 10px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--fg); border-radius: 99px; padding: 4px 14px 4px 4px; font: 600 13px/1 var(--f-ui); cursor: pointer; }
 .switch i { position: relative; width: 40px; height: 24px; border-radius: 99px; background: var(--line-strong); transition: background .18s; flex: none; }
 .switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--surface); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .18s; }
-.switch[aria-checked="true"] { border-color: var(--good); color: var(--good); }
-.switch[aria-checked="true"] i { background: var(--good); }
+.switch[aria-checked="true"] { border-color: var(--green); }
+.switch[aria-checked="true"] i { background: var(--green); }
 .switch[aria-checked="true"] i::after { transform: translateX(16px); }
 .switch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .switch:disabled { opacity: .6; cursor: progress; }
