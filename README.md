@@ -11,13 +11,14 @@ Tablero privado para llevar el negocio de madera estructural de Agrohermanos: ve
 
 | Sección | Qué hace |
 |---|---|
+| Remisiones | Cada cargue que sale: se sube la foto de la remisión, Claude saca el despiece, se confirma y se elige para quién es (un destino o repartido entre Barro Blanco, mayoristas, clientes finales o pedidos por entregar). Crea las ventas y despachos y suma la nómina del viaje. |
 | Resumen | Ventas, utilidad neta, rastras vendidas y utilidad por rastra del rango elegido; pedidos por entregar, deudas (te deben / debes), saldo con la pinera, inventario en Barro Blanco y alertas. |
 | Mayoristas | Pedidos y abonos por cliente. Los abonos pagan primero los pedidos más viejos para saber qué está vencido. Los pedidos *por entregar* no cuentan como venta ni deuda hasta que se entregan. Si un mayorista pagó de más, queda con *saldo a favor*. |
 | Barro Blanco | Inventario en el punto, despachos, devoluciones con su motivo (dañada, no se vendió…), ventas de la sociedad (del punto o con despacho directo, entregadas o por entregar, con la diferencia contra la lista), pagos y liquidación 50/50. |
 | Cliente final | Directorio de clientes finales, pedidos por entregar y despachados, y anticipos con foto del comprobante. Un pedido pendiente no cuenta como venta hasta que se despacha. |
 | Compras y gastos | Compra de madera a la pinera (estado de cuenta con saldo corrido) y gastos como fletes y cargues, que se restan de la utilidad. |
 | Pauta | Gasto en publicidad de Meta por campaña, con interruptor de prendida/apagada y presupuesto mensual o diario. Solo suma los días que estuvo prendida (o el cobro real del mes). |
-| Nómina | Lo que se le debe a cada trabajador. Cada despacho suma sus rastras × la tarifa de aserrada o arriada; los pagos (normalmente los sábados) lo bajan. |
+| Nómina | Lo que se le debe a cada trabajador. Cada viaje (remisión) suma sus rastras × la tarifa de aserrada o arriada; los abonos lo bajan. Al tocar a un trabajador se ve todo su historial. |
 | Precios y costos | A cómo nos sale la madera (por rastra y por pieza), calculadora de pieza, listas de precios pegadas desde Excel y configuración de la sociedad. |
 | Datos | Exportar a JSON o CSV, restaurar una copia y ver datos de ejemplo. |
 
@@ -61,4 +62,4 @@ node build.mjs
 
 ### Datos
 
-Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, `nomina`, `anticipos`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).
+Cada colección es una lista de documentos JSON: `listas`, `clientes`, `ventas`, `abonos`, `bbDespachos`, `bbVentas`, `bbPagos`, `pineraCompras`, `pineraPagos`, `gastos`, `nomina`, `anticipos`, `remisiones`, más `config/general`. En las listas de precios, `precios[medida][largo en cm] = precio por pieza` (por ejemplo `precios["4x6"]["300"]` es una 4x6 de 3 m).

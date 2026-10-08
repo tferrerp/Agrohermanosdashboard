@@ -20,7 +20,8 @@ const ENTRADAS = 'Tablero Agrohermanos · entradas';
 const PROCESADOS = 'Tablero Agrohermanos · entradas procesadas';
 const COPIAS = 'Tablero Agrohermanos · copias';
 const FOTOS = 'Tablero Agrohermanos · comprobantes';
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
+const REMISIONES = 'Tablero Agrohermanos · remisiones';
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'remisiones', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
 // Pestañas que no son registros.
 const RESERVADAS = ['config'];
 const ENCABEZADO = ['id', 'fecha', 'resumen', 'datos'];
@@ -170,12 +171,23 @@ function guardarArchivo(nombre, texto) {
   return carpeta_(COPIAS).createFile(nombre, texto, tipo).getUrl();
 }
 
-// Foto de un comprobante (llega en base64) a la carpeta de comprobantes de tu Drive.
-function guardarImagen(nombre, base64, tipo) {
+// Foto de un comprobante o de una remisión (llega en base64) a su carpeta de tu Drive.
+function guardarImagen(nombre, base64, tipo, carpeta) {
   if (!/^image\/(jpeg|png|webp|gif|heic|heif)$/.test(String(tipo))) throw new Error('Solo se pueden guardar fotos.');
-  const limpio = String(nombre || 'comprobante.jpg').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120);
+  const limpio = String(nombre || 'foto.jpg').replace(/[\\/:*?"<>|]+/g, '-').slice(0, 120);
   const blob = Utilities.newBlob(Utilities.base64Decode(base64), tipo, limpio);
-  return carpeta_(FOTOS).createFile(blob).getUrl();
+  return carpeta_(carpeta === 'remisiones' ? REMISIONES : FOTOS).createFile(blob).getUrl();
+}
+
+// Devuelve una foto guardada por el tablero para verla en la página. Solo lee de sus dos carpetas.
+function leerImagen(id) {
+  const f = DriveApp.getFileById(String(id));
+  const padres = f.getParents();
+  let permitido = false;
+  while (padres.hasNext()) { const nm = padres.next().getName(); if (nm === FOTOS || nm === REMISIONES) permitido = true; }
+  if (!permitido) throw new Error('Esa foto no es del tablero.');
+  const b = f.getBlob();
+  return 'data:' + b.getContentType() + ';base64,' + Utilities.base64Encode(b.getBytes());
 }
 
 /* ---------- Apoyo ---------- */
@@ -199,7 +211,7 @@ function prepararLibro_(libro) {
     ['La columna "resumen" es para leer; la columna "datos" es la que usa el tablero.'],
     ['Registra y edita desde el tablero, no a mano aquí, para que los cálculos no se dañen.'],
     [''],
-    ['Pestañas: listas (precios), clientes, ventas, abonos, anticipos, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, config.'],
+    ['Pestañas: listas (precios), clientes, ventas, abonos, anticipos, remisiones, bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, config.'],
   ]);
   h.getRange(1, 1).setFontWeight('bold').setFontSize(14);
   h.setColumnWidth(1, 720);
