@@ -2294,7 +2294,7 @@ function lineRow(mode, l = {}) {
       <input data-k="medida" value="${esc(isR ? 'rastras' : (l.medida || ''))}" placeholder="4x6" list="dl-medidas" aria-label="Medida en pulgadas" autocomplete="off">
       <input data-k="largo" class="qty" inputmode="decimal" value="${esc(qtyIn(l.largo))}" placeholder="m" aria-label="Largo en metros"></div></div>
     <div class="field"><label>${isR ? 'Rastras' : 'Cant.'}</label><input data-k="cant" class="qty" inputmode="decimal" value="${esc(qtyIn(l.cant))}" placeholder="0" aria-label="Cantidad"></div>
-    ${mode === 'dmg' ? '' : `<div class="field"><label>${mode === 'bbv' ? 'Precio venta' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
+    ${mode === 'dmg' ? '' : `<div class="field"><label>${mode === 'bbv' ? 'Precio venta' : mode === 'desp' ? 'Precio sociedad' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
     ${mode === 'bbv' ? `<div class="field"><label>Precio sociedad</label><input data-k="pbb" class="money" inputmode="numeric" value="${esc(moneyIn(l.pbb))}" placeholder="$0" data-auto="${n(l.pbb) ? 0 : 1}" aria-label="Precio de sociedad"></div>` : ''}
     <button type="button" class="icon-btn" data-act="rm-line" aria-label="Quitar pieza">${icon('x')}</button>
     <div class="lsub" data-sub></div>
@@ -2358,8 +2358,8 @@ function autoPrice(form, row) {
 
 /* ---- totales en vivo ---- */
 function liveSale(form, mode, extra = {}) {
-  const rows = $$('[data-line]', form);
-  let pzs = 0, ras = 0, sub = 0, costo = 0;
+  const rows = $$('[data-line]', form), lv = mode === 'desp' ? model().listaBBVenta : null;
+  let pzs = 0, ras = 0, sub = 0, costo = 0, venta = 0;
   for (const row of rows) {
     const l = readRow(row, mode);
     const s = row.querySelector('[data-sub]');
@@ -2367,11 +2367,16 @@ function liveSale(form, mode, extra = {}) {
     const lineSub = l.cant * l.precio, lineCost = l.cant * l.costo;
     if (l.unidad !== 'rastra') pzs += l.cant;
     ras += l.cant * l.rastras; sub += lineSub; costo += lineCost;
+    // En un despacho a Barro Blanco el precio es el de sociedad; el de la lista de venta va al lado como referencia.
+    const pv = lv && l.unidad !== 'rastra' ? listaPrecio(lv, l.medida, l.largo) : 0;
+    venta += l.cant * (pv || l.precio);
     s.textContent = l.unidad === 'rastra'
       ? `costo ${cop(l.costo)}/rastra · subtotal ${cop(lineSub)}`
-      : `${num(l.rastras, 4)} rastras/pza · costo ${cop(l.costo)}/pza · subtotal ${cop(lineSub)}`;
+      : mode === 'desp'
+        ? `${num(l.rastras, 4)} rastras/pza · sociedad ${cop(l.precio)}${pv ? ` · venta en lista ${cop(pv)} (la sociedad gana ${cop(pv - l.precio)})` : ' · sin precio en la lista de venta'}`
+        : `${num(l.rastras, 4)} rastras/pza · costo ${cop(l.costo)}/pza · subtotal ${cop(lineSub)}`;
   }
-  return { pzs, ras, sub, costo };
+  return { pzs, ras, sub, costo, venta };
 }
 function liveBBV(form) {
   const p = n(CFG().pctSocio) / 100;
@@ -2545,17 +2550,20 @@ const despForm = tipo => ({
     </div>
     ${tipo === 'devolucion' ? `<div class="note">Piezas que vuelven del punto: porque se dañaron, no se vendieron o hay que cambiarlas. Salen del inventario de ${esc(CFG().punto)} y ${esc(CFG().socio)} no las paga.</div>
     <div class="form-grid">${fld('f-motivo', '¿Por qué se devolvió?', selF('f-motivo', r.motivo || 'Pieza dañada', MOTIVOS_DEV))}${fld('f-motivo-det', 'Detalle', inp('f-motivo-det', r.motivoDetalle, { ph: 'Ej.: llegó rajada, se mojó' }))}</div>` : ''}
-    ${linesBlock('sale', r.items, tipo === 'devolucion' ? 'Piezas devueltas' : 'Piezas despachadas')}
+    ${tipo === 'devolucion' ? '' : `<div class="note">El precio de cada pieza es el <b>precio de sociedad</b>: lo que entra la madera al negocio. El de la lista de venta se usa cuando ${esc(CFG().socio)} vende; aquí lo ves al lado de cada pieza.</div>`}
+    ${linesBlock('desp', r.items, tipo === 'devolucion' ? 'Piezas devueltas' : 'Piezas despachadas')}
     <div class="form-grid">
       ${tipo === 'devolucion' ? '' : fld('f-costoFlete', 'Flete que pagaste', moneyF('f-costoFlete', r.costoFlete), { hint: 'Regístralo también en Gastos si quieres restarlo de la utilidad' })}
       ${commonNote(r)}
     </div><div id="live"></div>${datalistMedidas(model())}`,
   priceFor: (form, med, L) => pbbFor(med, L),
   live: form => {
-    const t = liveSale(form, 'sale');
-    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Valor a precio de sociedad', cop(t.sub), 1], ['Tu costo real', cop(t.costo)], ['Ganas en el precio de sociedad', `${signed(t.sub - t.costo)} · ${pct(t.sub ? (t.sub - t.costo) / t.sub : NaN)}`]]);
+    const t = liveSale(form, 'desp'), p = n(CFG().pctSocio);
+    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Valor a precio de sociedad', cop(t.sub), 1],
+      ...(tipo === 'devolucion' ? [] : [['Valor a precio de venta (lista)', cop(t.venta)], ['La sociedad ganaría si se vende a lista', signed(t.venta - t.sub)], [`Tu parte (${num(p, 0)}%)`, signed((t.venta - t.sub) * p / 100), 1]]),
+      ['Tu costo real', cop(t.costo)], ['Ganas en el precio de sociedad', `${signed(t.sub - t.costo)} · ${pct(t.sub ? (t.sub - t.costo) / t.sub : NaN)}`]]);
   },
-  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'sale'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'desp'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
 });
 FORMS['bb-despacho'] = despForm('despacho');
@@ -3228,7 +3236,7 @@ function remBody(W) {
     const lab = d.tipo === 'bb' ? 'Precio sociedad' : 'Precio c/u';
     return `<div class="dest"><div class="dest-h"><span class="dest-n">${esc(destNombre(d, M))}</span>${chip(d.tipo === 'bb' ? 'wood' : '', d.tipo === 'bb' ? 'Barro Blanco' : d.tipo === 'mayorista' ? 'Mayorista' : 'Cliente final')}</div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pieza</th><th class="r">Cant.</th><th class="r">${lab}</th><th class="r">Subtotal</th></tr></thead><tbody>
-      ${lines.map(({ l, j, cant }) => { const pr = d.precios?.[j] ?? destPrecio(d, l, M); return `<tr><td>${esc(nomLinea(l))}</td><td class="r">${num(cant, 0)}</td><td class="r"><input class="money" inputmode="numeric" data-precio="${i}:${j}" value="${esc(moneyIn(pr))}" placeholder="$0" aria-label="Precio de ${esc(nomLinea(l))}"></td><td class="r" data-sub="${i}:${j}">${cop(cant * pr)}</td></tr>`; }).join('')}
+      ${lines.map(({ l, j, cant }) => { const pr = d.precios?.[j] ?? destPrecio(d, l, M), pv = d.tipo === 'bb' ? listaPrecio(M.listaBBVenta, l.medida, l.largo) : 0; return `<tr><td>${esc(nomLinea(l))}${pv ? `<span class="sub">venta en lista ${cop(pv)}</span>` : ''}</td><td class="r">${num(cant, 0)}</td><td class="r"><input class="money" inputmode="numeric" data-precio="${i}:${j}" value="${esc(moneyIn(pr))}" placeholder="$0" aria-label="Precio de ${esc(nomLinea(l))}"></td><td class="r" data-sub="${i}:${j}">${cop(cant * pr)}</td></tr>`; }).join('')}
       </tbody><tfoot><tr><td>Total</td><td class="r">${num(sum(lines, x => x.cant), 0)}</td><td></td><td class="r" data-subt="${i}"></td></tr></tfoot></table></div></div>`;
   }).join('');
   return h + '<div id="live"></div>';
@@ -3529,7 +3537,8 @@ function openForm(kind, rec, prefill, ai) {
   if (!rec) for (const row of $$('[data-line]', $('#form'))) autoPrice($('#form'), row);
   recalcForm();
   cargarMiniaturas();
-  setTimeout(() => { const el = $('#form .panel-b input, #form .panel-b select'); if (el) el.focus(); }, 40);
+  // No le quita el foco a un campo en el que ya se esté escribiendo.
+  setTimeout(() => { const el = $('#form .panel-b input, #form .panel-b select'); if (el && !$('#form').contains(document.activeElement)) el.focus(); }, 40);
 }
 function openEdit(col, id) {
   const rec = (D()[col] || []).find(x => x.id === id);
