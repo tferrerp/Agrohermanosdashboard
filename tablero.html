@@ -740,7 +740,7 @@ function resumenDe(col, r) {
     switch (col) {
       case 'ventas': { const c = calcVenta(r); const quien = r.canal === 'final' ? (r.cliente?.nombre || 'Cliente final') : (S.data.clientes.find(x => x.id === r.clienteId)?.nombre || 'Mayorista'); return `${r.canal === 'final' ? 'Cliente final' : 'Mayorista'} · ${quien} · ${num(c.piezas, 0)} pzs · ${cop(c.total)}${r.estado ? ' · ' + r.estado : ''}`; }
       case 'bbVentas': { const c = calcBB(r, S.config.pctSocio); return `${r.danada ? 'Piezas dañadas' : r.origen === 'directo' ? 'Venta directa de la sociedad' : 'Venta en el punto'}${r.cliente ? ' · ' + r.cliente : ''} ${cop(c.venta)} · te liquida ${cop(c.debe)}${r.estado === 'Por entregar' ? ' · Por entregar' : ''}`; }
-      case 'bbDespachos': { const c = calcVenta(r); return `${r.tipo === 'devolucion' ? 'Devolución' : 'Despacho'} · ${num(c.piezas, 0)} pzs · ${cop(c.sub)} a precio de sociedad`; }
+      case 'bbDespachos': { const c = calcVenta(r), e = estimadoBB(r.items); return `${r.tipo === 'devolucion' ? 'Devolución' : 'Despacho'} · ${num(c.piezas, 0)} pzs${e ? ` · estimado ${cop(e)} a precio de venta` : ''}`; }
       case 'pineraCompras': return `${r.concepto || 'Madera'}${n(r.rastras) ? ' · ' + num(r.rastras, 4) + ' rastras' : ''} · ${cop(r.valor)}`;
       case 'gastos': return `${r.categoria || 'Gasto'} · ${r.descripcion || ''} · ${cop(r.valor)}`;
       case 'listas': return `${r.nombre} · ${Object.keys(r.precios || {}).length} medidas`;
@@ -1021,17 +1021,18 @@ function model() {
   const inv = new Map();
   const touch = l => {
     const k = itemKey(l);
-    if (!inv.has(k)) inv.set(k, { key: k, nombre: itemName(l), medida: l.medida, largo: n(l.largo), unidad: l.unidad || 'pieza', desp: 0, dev: 0, vend: 0, pbb: 0, costo: n(l.costo), rastras: n(l.rastras), fechaPbb: '' });
+    if (!inv.has(k)) inv.set(k, { key: k, nombre: itemName(l), medida: l.medida, largo: n(l.largo), unidad: l.unidad || 'pieza', desp: 0, dev: 0, vend: 0, pbb: 0, pv: 0, costo: n(l.costo), rastras: n(l.rastras), fechaDesp: '' });
     return inv.get(k);
   };
   for (const mv of d.bbDespachos) for (const l of mv.items || []) {
     const r = touch(l);
     if (mv.tipo === 'devolucion') r.dev += n(l.cant);
-    else { r.desp += n(l.cant); if ((mv.fecha || '') >= r.fechaPbb) { r.pbb = n(l.precio); r.fechaPbb = mv.fecha || ''; r.costo = n(l.costo); r.rastras = n(l.rastras); } }
+    else { r.desp += n(l.cant); if ((mv.fecha || '') >= r.fechaDesp) { r.fechaDesp = mv.fecha || ''; r.costo = n(l.costo); r.rastras = n(l.rastras); } }
   }
   // Una venta con despacho directo sale de Agrohermanos, no del inventario del punto.
   for (const v of d.bbVentas) if (v.origen !== 'directo') for (const l of v.items || []) touch(l).vend += n(l.cant);
-  for (const r of inv.values()) { r.stock = r.desp - r.dev - r.vend; if (!r.pbb) r.pbb = listaPrecio(listaBB, r.medida, r.largo); }
+  // El despacho va sin precio: lo que hay en el punto se estima a precio de venta al cliente final (lista de venta de la sociedad).
+  for (const r of inv.values()) { r.stock = r.desp - r.dev - r.vend; r.pbb = listaPrecio(listaBB, r.medida, r.largo); r.pv = listaPrecio(listaBBVenta, r.medida, r.largo); }
   const bbEntries = entries.filter(e => e.canal === 'bb');
   const bbSaldo = sum(bbEntries, e => e.ingreso) - sum(d.bbPagos, p => p.valor);
   const bbPorEntregar = sum(porEntregar.filter(p => p.canal === 'bb'), p => p.calc.debe);
@@ -1513,7 +1514,7 @@ VIEW_FN.resumen = R => {
   const P = periodo(M, R);
   const Q = S.range === 'todo' ? null : periodo(M, prevRange(R));
   const invPzs = sum([...M.inv.values()], r => Math.max(0, r.stock));
-  const invVal = sum([...M.inv.values()], r => Math.max(0, r.stock) * r.pbb);
+  const invVal = sum([...M.inv.values()], r => Math.max(0, r.stock) * r.pv);
   const porCobrar = M.mayorSaldo + M.finalSaldo + Math.max(0, M.bbSaldo) + M.bbPorEntregar;
   const margen = P.ingreso ? P.utilN / P.ingreso : NaN;
   const porRastra = P.rastras ? P.utilN / P.rastras : 0;
@@ -1527,7 +1528,7 @@ VIEW_FN.resumen = R => {
   const pos = `<div class="kpis soft">
     ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar, true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm', go: 'mayoristas' })}
     ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), Math.abs(M.pineraSaldo) < 0.5 ? 'Sin saldo' : M.pineraSaldo > 0 ? 'Le debes' : 'A tu favor', { cls: 'sm', go: 'compras' })}
-    ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `${cop(invVal)} a precio de sociedad`, { cls: 'sm', go: 'bb' })}
+    ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal)} a precio de venta`, { cls: 'sm', go: 'bb' })}
     ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm', go: 'compras' })}
   </div>`;
 
@@ -1649,7 +1650,7 @@ VIEW_FN.mayoristas = R => {
 /* ---------- Barro Blanco ---------- */
 VIEW_FN.bb = R => {
   const M = model(), cfg = M.cfg, p = n(cfg.pctSocio);
-  const head = `<div class="section-h"><p>Sociedad con ${esc(cfg.socio)} en ${esc(cfg.punto)}. Le despachas a precio de sociedad; cuando vende, la utilidad sobre ese precio se reparte ${p}/${100 - p}. ${esc(cfg.socio)} te liquida el precio de sociedad más tu parte.</p>
+  const head = `<div class="section-h"><p>Sociedad con ${esc(cfg.socio)} en ${esc(cfg.punto)}. El despacho va sin precio: la madera queda en el inventario del punto con un valor estimado a precio de venta al cliente final. El precio se pone cuando se vende: la utilidad (precio vendido menos precio de sociedad) se reparte ${p}/${100 - p} y ${esc(cfg.socio)} te liquida el precio de sociedad más tu parte.</p>
     <div class="acts">${S.sample ? btn(`${icon('spark')}Pegar mensaje de ${esc(cfg.socio)}`, 'data-act="form" data-form="ai"', 'sm') : ''}${addBtn('Venta', 'bb-venta', 'primary sm')}${addBtn('Despacho', 'bb-despacho')}${addBtn('Pago', 'bb-pago')}${addBtn('Devolución', 'bb-devolucion')}</div></div>`;
   const inv = [...M.inv.values()].filter(r => r.desp > 0 || r.vend > 0).sort((a, b) => (a.nombre).localeCompare(b.nombre, 'es', { numeric: true }));
   const PB = M.porEntregar.filter(p => p.canal === 'bb');
@@ -1662,20 +1663,20 @@ VIEW_FN.bb = R => {
     { h: 'Tu parte', r: 1, f: x => signed(x.calc.miParte) },
     { h: 'Te liquida', r: 1, f: x => `<b>${cop(x.calc.debe)}</b>` },
   ], PB, { act: x => editAttr('bbVentas', x.id) }), { sub: 'Ventas cerradas que todavía no se entregan. Ya cuentan como lo que te deben; cuentan como venta cuando las marques entregadas.' }) : '';
-  if (!inv.length && !M.d.bbPagos.length && !M.bbEntries.length) return head + pbCard + card('', emptyState('Todavía no hay movimientos con Barro Blanco', `Registra el primer despacho con la relación de despacho: medidas, largos y cantidades. El precio de sociedad sale de la lista “${esc(M.listaBB ? M.listaBB.nombre : 'Sociedad Barro Blanco')}”.`, addBtn('Despacho al punto', 'bb-despacho', '')))
-    + card(`Inventario en ${esc(cfg.punto)}`, `<div class="inv-res"><div><span>Piezas</span><b>0</b></div><div><span>Rastras</span><b>0</b></div><div><span>Referencias</span><b>0</b></div><div><span>A precio de sociedad</span><b>$0</b></div><div><span>Tu costo</span><b>$0</b></div><div><span>Por acabarse</span><b>0</b></div></div><p class="muted">Cuando registres el primer despacho, aquí ves cada pieza que hay en el punto, lo vendido y lo que queda.</p>`, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido.' });
+  if (!inv.length && !M.d.bbPagos.length && !M.bbEntries.length) return head + pbCard + card('', emptyState('Todavía no hay movimientos con Barro Blanco', 'Registra el primer despacho con la relación de despacho: medidas, largos y cantidades, sin precio. El precio se pone cuando se vende.', addBtn('Despacho al punto', 'bb-despacho', '')))
+    + card(`Inventario en ${esc(cfg.punto)}`, `<div class="inv-res"><div><span>Piezas</span><b>0</b></div><div><span>Rastras</span><b>0</b></div><div><span>Referencias</span><b>0</b></div><div><span>Valor estimado</span><b>$0</b></div><div><span>Tu costo</span><b>$0</b></div><div><span>Por acabarse</span><b>0</b></div></div><p class="muted">Cuando registres el primer despacho, aquí ves cada pieza que hay en el punto, lo vendido y lo que queda.</p>`, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido.' });
 
   const E = M.bbEntries.filter(e => inR(e.fecha, R));
   const k = f => sum(E, e => f(e.calc));
   const venta = k(c => c.venta), base = k(c => c.base), up = k(c => c.utilPunto), mi = k(c => c.miParte), socio = k(c => c.parteSocio), debe = k(c => c.debe), costo = k(c => c.costo), miU = k(c => c.miUtil), ras = k(c => c.rastras);
   const pagosR = M.d.bbPagos.filter(x => inR(x.fecha, R));
-  const invPzs = sum(inv, r => Math.max(0, r.stock)), invVal = sum(inv, r => Math.max(0, r.stock) * r.pbb), invCost = sum(inv, r => Math.max(0, r.stock) * r.costo);
+  const invPzs = sum(inv, r => Math.max(0, r.stock)), invVal = sum(inv, r => Math.max(0, r.stock) * r.pv), invCost = sum(inv, r => Math.max(0, r.stock) * r.costo);
 
   const kp = `<div class="kpis">
     ${kpi(`${esc(cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar), [M.bbSaldo < -0.5 ? `Tiene ${cop(-M.bbSaldo)} a favor` : 'Liquidaciones menos pagos recibidos', M.bbPorEntregar > 0.5 ? `incluye ${cop(M.bbPorEntregar, true)} de ventas por entregar` : ''].filter(Boolean).join(' · '), { dot: 'var(--s2)' })}
     ${kpi('Vendido en el punto', cop(venta), `${num(ras)} rastras · ${E.length} reportes`)}
     ${kpi('Tu utilidad', signed(miU), `${cop(mi, true)} de tu ${p}% + margen sobre tu costo`)}
-    ${kpi('Inventario en el punto', `${num(invPzs, 0)} pzs`, `${cop(invVal, true)} a precio sociedad · costo ${cop(invCost, true)}`)}
+    ${kpi('Inventario en el punto', `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal, true)} a precio de venta · costo ${cop(invCost, true)}`)}
   </div>`;
 
   const invT = table([
@@ -1684,20 +1685,18 @@ VIEW_FN.bb = R => {
     { h: 'Vendido', r: 1, f: r => num(r.vend, 0) },
     { h: 'En el punto', r: 1, f: r => `<b>${num(r.stock, 0)}</b><span class="sub">${num(Math.max(0, r.stock) * r.rastras)} rastras</span>` },
     { h: '', f: r => { const tot = Math.max(1, r.desp - r.dev); const f = Math.max(0, r.stock) / tot; return `<div class="meter ${r.stock <= 0 ? 'out' : r.stock <= n(cfg.stockMin) ? 'low' : ''}"><i style="width:${(f * 100).toFixed(0)}%"></i></div>`; } },
-    { h: 'Precio sociedad', r: 1, f: r => cop(r.pbb) },
-    ...(M.listaBBVenta ? [{ h: 'Precio venta', r: 1, f: r => { const pv = listaPrecio(M.listaBBVenta, r.medida, r.largo); return pv ? cop(pv) : '<span class="muted">—</span>'; } }] : []),
-    { h: 'Valor', r: 1, f: r => cop(Math.max(0, r.stock) * r.pbb) },
-  ], inv, { empty: '<p>No hay piezas en el punto.</p>', foot: inv.length > 1 ? ['Total', num(sum(inv, r => r.desp - r.dev), 0), num(sum(inv, r => r.vend), 0), num(invPzs, 0), '', '', ...(M.listaBBVenta ? [''] : []), cop(invVal)] : null });
+    { h: 'Precio venta', r: 1, f: r => r.pv ? cop(r.pv) : '<span class="muted">Sin precio</span>' },
+    { h: 'Valor estimado', r: 1, f: r => r.pv ? cop(Math.max(0, r.stock) * r.pv) : '<span class="muted">—</span>' },
+  ], inv, { empty: '<p>No hay piezas en el punto.</p>', foot: inv.length > 1 ? ['Total', num(sum(inv, r => r.desp - r.dev), 0), num(sum(inv, r => r.vend), 0), num(invPzs, 0), '', '', cop(invVal)] : null });
   const invRas = sum(inv, r => Math.max(0, r.stock) * r.rastras), bajos = inv.filter(r => r.desp > 0 && r.stock <= n(cfg.stockMin));
-  const invRes = `<div class="inv-res"><div><span>Piezas</span><b>${num(invPzs, 0)}</b></div><div><span>Rastras</span><b>${num(invRas)}</b></div><div><span>Referencias</span><b>${num(inv.filter(r => r.stock > 0).length, 0)}</b></div><div><span>A precio de sociedad</span><b>${cop(invVal, true)}</b></div><div><span>Tu costo</span><b>${cop(invCost, true)}</b></div><div><span>Por acabarse</span><b class="${bajos.length ? 'neg' : ''}">${num(bajos.length, 0)}</b></div></div>`;
+  const invRes = `<div class="inv-res"><div><span>Piezas</span><b>${num(invPzs, 0)}</b></div><div><span>Rastras</span><b>${num(invRas)}</b></div><div><span>Referencias</span><b>${num(inv.filter(r => r.stock > 0).length, 0)}</b></div><div><span>Valor estimado</span><b>${cop(invVal, true)}</b></div><div><span>Tu costo</span><b>${cop(invCost, true)}</b></div><div><span>Por acabarse</span><b class="${bajos.length ? 'neg' : ''}">${num(bajos.length, 0)}</b></div></div>`;
 
-  // Si ya está la lista de venta de la sociedad: cuánto deja el inventario si se vende todo a precio de lista.
+  // Estimado: cuánto deja lo que hay en el punto si se vende todo a precio de venta al cliente final.
   let proyeccion = '';
-  if (M.listaBBVenta) {
-    let pv = 0, pb = 0, faltan = 0;
-    for (const r of inv) { if (r.stock <= 0) continue; const v = listaPrecio(M.listaBBVenta, r.medida, r.largo); if (!v) { faltan++; continue; } pv += v * r.stock; pb += r.pbb * r.stock; }
-    const upP = pv - pb;
-    proyeccion = `<div class="note" style="margin-top:12px">Si se vende todo el inventario a precio de lista: venta ${cop(pv)}, utilidad del punto ${cop(upP)}, tu parte ${cop(upP * p / 100)}.${faltan ? ` ${faltan} ${faltan === 1 ? 'referencia no tiene' : 'referencias no tienen'} precio de venta.` : ''}</div>`;
+  const enPunto = inv.filter(r => r.stock > 0);
+  if (enPunto.length) {
+    const est = estimadoInv(enPunto, p);
+    proyeccion = `<div class="note" style="margin-top:12px">Estimado si se vende todo a precio de venta al cliente final: venta ${cop(est.venta)}, utilidad de la sociedad ${signed(est.util)}, tu parte ${signed(est.miParte)}. Es solo un estimado: el precio real se pone en cada venta.${est.sinPv ? ` ${est.sinPv === 1 ? 'Una medida no tiene' : `${est.sinPv} medidas no tienen`} precio en la lista de venta: no ${est.sinPv === 1 ? 'entra' : 'entran'} en el estimado.` : ''}${est.sinPb ? ` ${est.sinPb === 1 ? 'Una medida no tiene' : `${est.sinPb} medidas no tienen`} precio de sociedad todavía: no ${est.sinPb === 1 ? 'entra' : 'entran'} en la utilidad.` : ''}</div>`;
   }
   const liq = `<div class="ledger">
     <div><span>Venta en el punto</span><b>${cop(venta)}</b></div>
@@ -1727,7 +1726,7 @@ VIEW_FN.bb = R => {
     { h: 'Remisión', f: x => `<span class="num">${esc(x.remision || '—')}</span>` },
     { h: 'Detalle', f: x => detalle(calcVenta(x).lines) },
     { h: 'Rastras', r: 1, f: x => num(calcVenta(x).rastras) },
-    { h: 'Valor sociedad', r: 1, f: x => cop(calcVenta(x).sub) },
+    { h: 'Valor estimado', r: 1, f: x => { const e = estimadoBB(x.items); return e ? cop(e) : '<span class="muted">—</span>'; } },
   ], D0, { act: x => editAttr('bbDespachos', x.id), empty: '<p>No hay despachos en este período.</p>' });
   const P0 = M.d.bbPagos.filter(x => inR(x.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const pt = table([
@@ -1738,7 +1737,7 @@ VIEW_FN.bb = R => {
   ], P0, { act: x => editAttr('bbPagos', x.id), empty: '<p>No hay pagos en este período.</p>' });
 
   return `${head}${kp}${pbCard}
-    ${card(`Inventario en ${esc(cfg.punto)}`, invRes + invT, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido. El precio de sociedad es el del último despacho de cada pieza.', acts: addBtn('Despacho', 'bb-despacho') + addBtn('Devolución', 'bb-devolucion') })}
+    ${card(`Inventario en ${esc(cfg.punto)}`, invRes + invT, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido. El valor es un estimado a precio de venta al cliente final; el precio real se pone en cada venta.', acts: addBtn('Despacho', 'bb-despacho') + addBtn('Devolución', 'bb-devolucion') })}
     <div class="grid g-1-1">
       ${card('Liquidación del período', liq, { sub: 'Cómo se reparte lo que se vendió en el rango elegido.' })}
       ${card(`Pagos de ${esc(cfg.socio)}`, pt, { acts: addBtn('Pago', 'bb-pago') })}
@@ -2092,7 +2091,7 @@ VIEW_FN.remisiones = R => {
   const kp = `<div class="kpis">
     ${kpi('Remisiones', num(E.length, 0), `${num(sum(E, r => r.piezas), 0)} piezas cargadas`, { dot: 'var(--s2)' })}
     ${kpi('Rastras despachadas', num(sum(E, r => r.rastras)), 'En el período')}
-    ${kpi('Valor despachado', cop(sum(E, r => r.valor)), 'Ventas y despachos a precio de cada destino')}
+    ${kpi('Valor despachado', cop(sum(E, r => r.valor)), 'Ventas a su precio; Barro Blanco estimado a precio de venta')}
     ${kpi('Nómina de los viajes', cop(sum(E, r => nom(r.id))), M.trab.map(t => esc(t.nombre)).join(' y ') || 'Configura la nómina', { go: 'nomina' })}
   </div>`;
   const t = table([
@@ -2289,12 +2288,12 @@ function parseLoose(s) {
 function lineRow(mode, l = {}) {
   const isR = l.unidad === 'rastra';
   const keep = l.medida && l.costo != null && l.rastras != null ? ` data-costo="${n(l.costo)}" data-rastras="${n(l.rastras)}"` : '';
-  return `<div class="line ${mode === 'bbv' ? 'm-bbv' : mode === 'dmg' ? 'm-dmg' : 'm-sale'}" data-line${keep}>
+  return `<div class="line ${mode === 'bbv' ? 'm-bbv' : mode === 'dmg' || mode === 'desp' ? 'm-dmg' : 'm-sale'}" data-line${keep}>
     <div class="field f-prod"><label>Medida y largo (m)</label><div style="display:grid;grid-template-columns:minmax(0,1fr) 76px;gap:6px">
       <input data-k="medida" value="${esc(isR ? 'rastras' : (l.medida || ''))}" placeholder="4x6" list="dl-medidas" aria-label="Medida en pulgadas" autocomplete="off">
       <input data-k="largo" class="qty" inputmode="decimal" value="${esc(qtyIn(l.largo))}" placeholder="m" aria-label="Largo en metros"></div></div>
     <div class="field"><label>${isR ? 'Rastras' : 'Cant.'}</label><input data-k="cant" class="qty" inputmode="decimal" value="${esc(qtyIn(l.cant))}" placeholder="0" aria-label="Cantidad"></div>
-    ${mode === 'dmg' ? '' : `<div class="field"><label>${mode === 'bbv' ? 'Precio venta' : mode === 'desp' ? 'Precio sociedad' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
+    ${mode === 'dmg' || mode === 'desp' ? '' : `<div class="field"><label>${mode === 'bbv' ? 'Precio venta' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
     ${mode === 'bbv' ? `<div class="field"><label>Precio sociedad</label><input data-k="pbb" class="money" inputmode="numeric" value="${esc(moneyIn(l.pbb))}" placeholder="$0" data-auto="${n(l.pbb) ? 0 : 1}" aria-label="Precio de sociedad"></div>` : ''}
     <button type="button" class="icon-btn" data-act="rm-line" aria-label="Quitar pieza">${icon('x')}</button>
     <div class="lsub" data-sub></div>
@@ -2341,11 +2340,20 @@ function listaCliente(form) {
   const c = M.cli.get(val(form, 'f-cliente'));
   return c ? M.listas.get(c.listaId) : null;
 }
-function pbbFor(med, L) {
-  const M = model();
-  const pz = parseMedida(med);
-  if (pz) { const r = M.inv.get(`${pz.key}|${largoKey(L)}`); if (r && r.pbb) return r.pbb; }
-  return listaPrecio(M.listaBB, med, L);
+// Precio de sociedad (lo que entra la madera al negocio): sale de la lista de la sociedad y se fija en la venta.
+const pbbFor = (med, L) => listaPrecio(model().listaBB, med, L);
+// Precio de venta al cliente final: con él se estima lo que vale la madera despachada a Barro Blanco.
+const pvFor = (med, L) => listaPrecio(model().listaBBVenta, med, L);
+const estimadoBB = items => sum((items || []).filter(l => l.unidad !== 'rastra'), l => n(l.cant) * pvFor(l.medida, l.largo));
+function estimadoInv(rows, pct) {
+  let venta = 0, util = 0, sinPv = 0, sinPb = 0;
+  for (const r of rows) {
+    const q = Math.max(0, r.stock);
+    if (!r.pv) { sinPv++; continue; }
+    venta += q * r.pv;
+    if (r.pbb) util += q * (r.pv - r.pbb); else sinPb++;
+  }
+  return { venta, util, miParte: util * pct / 100, sinPv, sinPb };
 }
 function autoPrice(form, row) {
   const F = FORMS[S.form.kind];
@@ -2358,8 +2366,8 @@ function autoPrice(form, row) {
 
 /* ---- totales en vivo ---- */
 function liveSale(form, mode, extra = {}) {
-  const rows = $$('[data-line]', form), lv = mode === 'desp' ? model().listaBBVenta : null;
-  let pzs = 0, ras = 0, sub = 0, costo = 0, venta = 0;
+  const rows = $$('[data-line]', form);
+  let pzs = 0, ras = 0, sub = 0, costo = 0;
   for (const row of rows) {
     const l = readRow(row, mode);
     const s = row.querySelector('[data-sub]');
@@ -2367,16 +2375,27 @@ function liveSale(form, mode, extra = {}) {
     const lineSub = l.cant * l.precio, lineCost = l.cant * l.costo;
     if (l.unidad !== 'rastra') pzs += l.cant;
     ras += l.cant * l.rastras; sub += lineSub; costo += lineCost;
-    // En un despacho a Barro Blanco el precio es el de sociedad; el de la lista de venta va al lado como referencia.
-    const pv = lv && l.unidad !== 'rastra' ? listaPrecio(lv, l.medida, l.largo) : 0;
-    venta += l.cant * (pv || l.precio);
     s.textContent = l.unidad === 'rastra'
       ? `costo ${cop(l.costo)}/rastra · subtotal ${cop(lineSub)}`
-      : mode === 'desp'
-        ? `${num(l.rastras, 4)} rastras/pza · sociedad ${cop(l.precio)}${pv ? ` · venta en lista ${cop(pv)} (la sociedad gana ${cop(pv - l.precio)})` : ' · sin precio en la lista de venta'}`
-        : `${num(l.rastras, 4)} rastras/pza · costo ${cop(l.costo)}/pza · subtotal ${cop(lineSub)}`;
+      : `${num(l.rastras, 4)} rastras/pza · costo ${cop(l.costo)}/pza · subtotal ${cop(lineSub)}`;
   }
-  return { pzs, ras, sub, costo, venta };
+  return { pzs, ras, sub, costo };
+}
+// Despacho o devolución de Barro Blanco: sin precio; cada pieza se estima a precio de venta al cliente final.
+function liveDesp(form) {
+  const rows = [];
+  let pzs = 0, ras = 0, costo = 0;
+  for (const row of $$('[data-line]', form)) {
+    const l = readRow(row, 'desp'), s = row.querySelector('[data-sub]');
+    if (!l.ok || !l.cant) { s.textContent = l.medida && !l.ok ? 'Medida no válida: usa el formato 4x6' : ''; continue; }
+    if (l.unidad !== 'rastra') pzs += l.cant;
+    ras += l.cant * l.rastras; costo += l.cant * l.costo;
+    if (l.unidad === 'rastra') { s.textContent = `${num(l.cant, 3)} rastras sin detalle · sin estimado`; continue; }
+    const pv = pvFor(l.medida, l.largo);
+    rows.push({ stock: l.cant, pv, pbb: pbbFor(l.medida, l.largo) });
+    s.textContent = `${num(l.rastras, 4)} rastras/pza · ${pv ? `estimado ${cop(pv)} c/u a precio de venta · ${cop(l.cant * pv)}` : 'sin precio en la lista de venta'}`;
+  }
+  return { pzs, ras, costo, est: estimadoInv(rows, n(CFG().pctSocio)) };
 }
 function liveBBV(form) {
   const p = n(CFG().pctSocio) / 100;
@@ -2550,20 +2569,21 @@ const despForm = tipo => ({
     </div>
     ${tipo === 'devolucion' ? `<div class="note">Piezas que vuelven del punto: porque se dañaron, no se vendieron o hay que cambiarlas. Salen del inventario de ${esc(CFG().punto)} y ${esc(CFG().socio)} no las paga.</div>
     <div class="form-grid">${fld('f-motivo', '¿Por qué se devolvió?', selF('f-motivo', r.motivo || 'Pieza dañada', MOTIVOS_DEV))}${fld('f-motivo-det', 'Detalle', inp('f-motivo-det', r.motivoDetalle, { ph: 'Ej.: llegó rajada, se mojó' }))}</div>` : ''}
-    ${tipo === 'devolucion' ? '' : `<div class="note">El precio de cada pieza es el <b>precio de sociedad</b>: lo que entra la madera al negocio. El de la lista de venta se usa cuando ${esc(CFG().socio)} vende; aquí lo ves al lado de cada pieza.</div>`}
+    ${tipo === 'devolucion' ? '' : `<div class="note">El despacho va <b>sin precio</b>. Las piezas quedan en el inventario de ${esc(CFG().punto)} con un valor estimado, como si se vendieran todas a precio de venta al cliente final. El precio real se pone cuando ${esc(CFG().socio)} venda.</div>`}
     ${linesBlock('desp', r.items, tipo === 'devolucion' ? 'Piezas devueltas' : 'Piezas despachadas')}
     <div class="form-grid">
       ${tipo === 'devolucion' ? '' : fld('f-costoFlete', 'Flete que pagaste', moneyF('f-costoFlete', r.costoFlete), { hint: 'Regístralo también en Gastos si quieres restarlo de la utilidad' })}
       ${commonNote(r)}
     </div><div id="live"></div>${datalistMedidas(model())}`,
-  priceFor: (form, med, L) => pbbFor(med, L),
   live: form => {
-    const t = liveSale(form, 'desp'), p = n(CFG().pctSocio);
-    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Valor a precio de sociedad', cop(t.sub), 1],
-      ...(tipo === 'devolucion' ? [] : [['Valor a precio de venta (lista)', cop(t.venta)], ['La sociedad ganaría si se vende a lista', signed(t.venta - t.sub)], [`Tu parte (${num(p, 0)}%)`, signed((t.venta - t.sub) * p / 100), 1]]),
-      ['Tu costo real', cop(t.costo)], ['Ganas en el precio de sociedad', `${signed(t.sub - t.costo)} · ${pct(t.sub ? (t.sub - t.costo) / t.sub : NaN)}`]]);
+    const t = liveDesp(form), p = n(CFG().pctSocio), e = t.est;
+    const avisos = [e.sinPv ? `${e.sinPv === 1 ? 'Una medida no tiene' : `${e.sinPv} medidas no tienen`} precio en la lista de venta: no ${e.sinPv === 1 ? 'entra' : 'entran'} en el estimado.` : '', e.sinPb ? `${e.sinPb === 1 ? 'Una medida no tiene' : `${e.sinPb} medidas no tienen`} precio de sociedad todavía: no ${e.sinPb === 1 ? 'entra' : 'entran'} en la utilidad estimada.` : ''].filter(Boolean);
+    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], [tipo === 'devolucion' ? 'Valor estimado que sale del punto' : 'Valor estimado (a precio de venta)', cop(e.venta), 1],
+      ...(tipo === 'devolucion' ? [] : [['Utilidad estimada de la sociedad', signed(e.util)], [`Tu parte estimada (${num(p, 0)}%)`, signed(e.miParte)]]),
+      ['Tu costo real', cop(t.costo)]]) + (avisos.length ? `<div class="note">${avisos.join(' ')}</div>` : '');
   },
-  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'desp'), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
+  // El despacho no guarda precio: el precio se pone en la venta.
+  read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'desp').map(({ precio, ...l }) => l), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
 });
 FORMS['bb-despacho'] = despForm('despacho');
@@ -2579,7 +2599,7 @@ FORMS['bb-venta'] = {
       ${fld('f-origen', '¿De dónde sale la madera?', selF('f-origen', r.origen || 'punto', [['punto', `Del inventario de ${CFG().punto}`], ['directo', 'Despacho directo desde Agrohermanos']]), { hint: 'Directo no descuenta del inventario del punto y suma a la nómina cuando sale.' })}
       ${fld('f-clientebb', 'Cliente o proyecto', inp('f-clientebb', r.cliente, { ph: 'Opcional: a quién se le vendió' }), { full: true })}
     </div>
-    <div class="note">Escribe lo que se vendió y a qué precio. El precio de sociedad sale del último despacho de esa pieza o, si no hay, de la lista de la sociedad.</div>
+    <div class="note">Escribe lo que se vendió y a qué precio. El precio de venta sale de la lista de venta: cámbialo si se vendió más caro o con descuento. El precio de sociedad sale de la lista de la sociedad.</div>
     ${linesBlock('bbv', r.items, 'Piezas vendidas')}
     <div class="form-grid">${commonNote(r)}</div><div id="live"></div>${datalistMedidas(model())}`,
   priceFor: (form, med, L) => listaPrecio(model().listaBBVenta, med, L),
@@ -2606,7 +2626,7 @@ FORMS['bb-danada'] = {
       const l = readRow(row, 'dmg'), sub = row.querySelector('[data-sub]');
       if (!l.ok || !l.cant) { sub.textContent = l.medida && !l.ok ? 'Medida no válida: usa el formato 4x6' : ''; continue; }
       base += l.cant * l.pbb; costo += l.cant * l.costo; pzs += l.cant;
-      sub.textContent = l.pbb ? `precio de sociedad ${cop(l.pbb)} c/u` : 'Esta pieza no está en el inventario del punto';
+      sub.textContent = l.pbb ? `precio de sociedad ${cop(l.pbb)} c/u` : 'Esta pieza no tiene precio de sociedad en la lista';
     }
     return totalsBox([['Piezas', num(pzs, 0)], ['Pérdida a precio de sociedad', cop(base)], [`Asumes tú (${num(p * 100, 0)}%)`, cop(base * p)], [`Asume ${esc(CFG().socio)} y te lo reconoce`, cop(base * (1 - p)), 1], ['Tu costo real de esas piezas', cop(costo)], ['Efecto en tu utilidad', signed(base * (1 - p) - costo), 1]]);
   },
@@ -3107,7 +3127,6 @@ function destNombre(d, M = model()) {
 }
 // Precio sugerido de una pieza según a dónde va: sociedad para Barro Blanco, la lista del mayorista, la de clientes finales.
 function destPrecio(d, l, M = model()) {
-  if (d.tipo === 'bb') return pbbFor(l.medida, l.largo) || 0;
   if (d.tipo === 'mayorista') return listaPrecio(M.listas.get(M.cli.get(d.clienteId)?.listaId), l.medida, l.largo) || 0;
   if (d.tipo === 'final') return listaPrecio(M.listas.get(M.cfg.listaFinal), l.medida, l.largo) || 0;
   return 0;
@@ -3233,10 +3252,18 @@ function remBody(W) {
         <div class="ledger"><div><span>Pedido</span><b>${p ? `${num(p.calc.piezas, 0)} pzs · ${cop(p.calc.total)}` : '—'}</b></div><div><span>En esta remisión</span><b>${num(pz, 0)} pzs</b></div></div>
         ${p && Math.abs(pz - p.calc.piezas) > 0.5 ? `<div class="note">La remisión trae ${num(pz, 0)} piezas para este pedido y el pedido tiene ${num(p.calc.piezas, 0)}. Se marca entregado con lo del pedido; si cambió algo, edítalo después.</div>` : ''}</div>`;
     }
-    const lab = d.tipo === 'bb' ? 'Precio sociedad' : 'Precio c/u';
+    if (d.tipo === 'bb') {
+      const est = sum(lines, ({ l, cant }) => cant * (l.unidad === 'rastra' ? 0 : pvFor(l.medida, l.largo)));
+      return `<div class="dest"><div class="dest-h"><span class="dest-n">${esc(destNombre(d, M))}</span>${chip('wood', 'Barro Blanco')}</div>
+        <div class="note">Va sin precio: queda en el inventario del punto. El estimado es a precio de venta al cliente final; el precio real se pone cuando ${esc(M.cfg.socio)} venda.</div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pieza</th><th class="r">Cant.</th><th class="r">Precio venta</th><th class="r">Estimado</th></tr></thead><tbody>
+        ${lines.map(({ l, cant }) => { const pv = l.unidad === 'rastra' ? 0 : pvFor(l.medida, l.largo); return `<tr><td>${esc(nomLinea(l))}</td><td class="r">${num(cant, 0)}</td><td class="r">${pv ? cop(pv) : '<span class="muted">Sin precio</span>'}</td><td class="r">${pv ? cop(cant * pv) : '—'}</td></tr>`; }).join('')}
+        </tbody><tfoot><tr><td>Total estimado</td><td class="r">${num(sum(lines, x => x.cant), 0)}</td><td></td><td class="r">${cop(est)}</td></tr></tfoot></table></div></div>`;
+    }
+    const lab = 'Precio c/u';
     return `<div class="dest"><div class="dest-h"><span class="dest-n">${esc(destNombre(d, M))}</span>${chip(d.tipo === 'bb' ? 'wood' : '', d.tipo === 'bb' ? 'Barro Blanco' : d.tipo === 'mayorista' ? 'Mayorista' : 'Cliente final')}</div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Pieza</th><th class="r">Cant.</th><th class="r">${lab}</th><th class="r">Subtotal</th></tr></thead><tbody>
-      ${lines.map(({ l, j, cant }) => { const pr = d.precios?.[j] ?? destPrecio(d, l, M), pv = d.tipo === 'bb' ? listaPrecio(M.listaBBVenta, l.medida, l.largo) : 0; return `<tr><td>${esc(nomLinea(l))}${pv ? `<span class="sub">venta en lista ${cop(pv)}</span>` : ''}</td><td class="r">${num(cant, 0)}</td><td class="r"><input class="money" inputmode="numeric" data-precio="${i}:${j}" value="${esc(moneyIn(pr))}" placeholder="$0" aria-label="Precio de ${esc(nomLinea(l))}"></td><td class="r" data-sub="${i}:${j}">${cop(cant * pr)}</td></tr>`; }).join('')}
+      ${lines.map(({ l, j, cant }) => { const pr = d.precios?.[j] ?? destPrecio(d, l, M); return `<tr><td>${esc(nomLinea(l))}</td><td class="r">${num(cant, 0)}</td><td class="r"><input class="money" inputmode="numeric" data-precio="${i}:${j}" value="${esc(moneyIn(pr))}" placeholder="$0" aria-label="Precio de ${esc(nomLinea(l))}"></td><td class="r" data-sub="${i}:${j}">${cop(cant * pr)}</td></tr>`; }).join('')}
       </tbody><tfoot><tr><td>Total</td><td class="r">${num(sum(lines, x => x.cant), 0)}</td><td></td><td class="r" data-subt="${i}"></td></tr></tfoot></table></div></div>`;
   }).join('');
   return h + '<div id="live"></div>';
@@ -3245,7 +3272,7 @@ function remBody(W) {
 FORMS['remision'] = {
   eyebrow: 'Remisiones', title: 'Nueva remisión de cargue', done: 'Remisión guardada',
   init: () => ({ step: 1, fecha: todayStr(), numero: '', items: [], modo: '', destinos: [{ tipo: '' }], asig: [] }),
-  cta: W => W.step === 1 ? 'Siguiente' : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? 'Revisar precios' : 'Guardar remisión',
+  cta: W => W.step === 1 ? 'Siguiente' : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? 'Revisar y confirmar' : 'Guardar remisión',
   foot: W => `<button type="button" class="btn" data-act="rem-back"${W.step > 1 ? '' : ' hidden'}>Atrás</button>`,
   body: W => remBody(W),
   onChange: (t, f) => {
@@ -3272,8 +3299,9 @@ FORMS['remision'] = {
       return falta > 0.001 ? `<div class="note">Faltan ${num(falta, 0)} piezas por asignar.</div>` : '<div class="note">Todo asignado.</div>';
     }
     if (W.step === 4) {
-      let total = 0;
+      let total = 0, est = 0;
       W.destinos.forEach((d, i) => {
+        if (d.tipo === 'bb') { est += estimadoBB(W.items.map((l, j) => ({ ...l, cant: n(W.asig[i][j]) }))); return; }
         let st = 0;
         for (const inp of $$(`[data-precio^="${i}:"]`, form)) { const j = +inp.dataset.precio.split(':')[1], cant = n(W.asig[i][j]), v = cant * parseMoney(inp.value); st += v; const c = $(`[data-sub="${i}:${j}"]`, form); if (c) c.textContent = cop(v); }
         if (d.tipo === 'pedido') st = model().porEntregar.find(x => x.id === d.pedidoId)?.calc.total || 0;
@@ -3281,7 +3309,8 @@ FORMS['remision'] = {
         total += st;
       });
       const ras = remRastras(W.items);
-      return totalsBox([['Valor de lo despachado', cop(total), 1], ['Rastras del viaje', num(ras, 3)], ...remNomina(ras).map(([nm, v]) => [`Se le suma a ${esc(nm)}`, cop(v)])]);
+      const hayBB = W.destinos.some(d => d.tipo === 'bb'), hayVenta = W.destinos.some(d => d.tipo !== 'bb');
+      return totalsBox([...(hayVenta ? [['Valor de lo vendido', cop(total), 1]] : []), ...(hayBB ? [[`A ${esc(model().cfg.punto)} (estimado, sin precio)`, cop(est), hayVenta ? 0 : 1]] : []), ['Rastras del viaje', num(ras, 3)], ...remNomina(ras).map(([nm, v]) => [`Se le suma a ${esc(nm)}`, cop(v)])]);
     }
     return '';
   },
@@ -3318,7 +3347,7 @@ FORMS['remision'] = {
     }
     // Paso 4: guardar
     for (const [i, d] of W.destinos.entries()) {
-      if (d.tipo === 'pedido') continue;
+      if (d.tipo === 'pedido' || d.tipo === 'bb') continue;
       const sinPrecio = W.items.some((l, j) => n(W.asig[i][j]) > 0 && !n(d.precios?.[j] ?? destPrecio(d, l)));
       if (sinPrecio) { formError(`Falta el precio de alguna pieza para ${destNombre(d)}.`); return; }
     }
@@ -3332,10 +3361,11 @@ async function remGuardar(W) {
   const extra = { remisionId, remision: W.numero || '', fecha: W.fecha, mo };
   const destinos = [];
   for (const [i, d] of W.destinos.entries()) {
-    const items = W.items.map((l, j) => ({ ...l, cant: n(W.asig[i][j]), precio: n(d.precios?.[j] ?? destPrecio(d, l, M)) })).filter(l => l.cant > 0);
+    // Lo que va a Barro Blanco no lleva precio: se pone cuando se vende.
+    const items = W.items.map(({ precio, ...l }, j) => ({ ...l, cant: n(W.asig[i][j]), ...(d.tipo === 'bb' ? {} : { precio: n(d.precios?.[j] ?? destPrecio(d, l, M)) }) })).filter(l => l.cant > 0);
     const r = { tipo: d.tipo, nombre: destNombre(d, M), piezas: sum(items.filter(l => l.unidad !== 'rastra'), l => l.cant), rastras: remRastras(items) };
     if (d.tipo === 'bb') {
-      r.col = 'bbDespachos'; r.valor = sum(items, l => l.cant * l.precio);
+      r.col = 'bbDespachos'; r.valor = estimadoBB(items); r.estimado = true;
       r.id = await Store.save('bbDespachos', { tipo: 'despacho', items, ...extra });
     } else if (d.tipo === 'mayorista') {
       r.col = 'ventas'; r.valor = sum(items, l => l.cant * l.precio);
@@ -3374,7 +3404,7 @@ FORMS['remision-ver'] = {
     const nom = M.nominaMovs.filter(m => m.col === 'remisiones' && m.id === r.id && m.tipo === 'devengo');
     return `<div class="rem-top">${tieneFoto(r) ? fotoThumb(r, 'remisión').replace('class="thumb"', 'class="thumb big"') : ''}<div><b>${r.numero ? `Remisión ${esc(r.numero)}` : 'Remisión sin número'}</b><span class="muted" style="display:block;font-size:12.5px">${fmtDate(r.fecha)} · ${num(r.piezas, 0)} piezas · ${num(r.rastras)} rastras · ${cop(r.valor)}</span></div></div>
       <div class="form-sec"><h4>Para quién fue</h4></div>
-      <div class="ledger">${(r.destinos || []).map(x => `<div class="lk" data-act="edit" data-col="${esc(x.col)}" data-id="${esc(x.id)}" role="button" tabindex="0"><span>${esc(x.nombre)}<small>${x.convertido ? 'Pedido que estaba por entregar' : x.tipo === 'bb' ? 'Despacho a Barro Blanco' : x.tipo === 'mayorista' ? 'Mayorista' : 'Cliente final'} · ${num(x.piezas, 0)} pzs · ${num(x.rastras)} rastras</small></span><b>${cop(x.valor)}</b></div>`).join('')}</div>
+      <div class="ledger">${(r.destinos || []).map(x => `<div class="lk" data-act="edit" data-col="${esc(x.col)}" data-id="${esc(x.id)}" role="button" tabindex="0"><span>${esc(x.nombre)}<small>${x.convertido ? 'Pedido que estaba por entregar' : x.tipo === 'bb' ? 'Despacho a Barro Blanco · sin precio, valor estimado' : x.tipo === 'mayorista' ? 'Mayorista' : 'Cliente final'} · ${num(x.piezas, 0)} pzs · ${num(x.rastras)} rastras</small></span><b>${cop(x.valor)}</b></div>`).join('')}</div>
       <div class="form-sec"><h4>Despiece</h4></div>
       <div class="ledger">${(r.items || []).map(l => `<div><span>${esc(nomLinea(l))}</span><b>${num(l.cant, 0)} pzs</b></div>`).join('')}</div>
       ${nom.length ? `<div class="form-sec"><h4>Nómina de este viaje</h4></div><div class="ledger">${nom.map(m => `<div><span>${esc(M.trab.find(t => t.id === m.trabajadorId)?.nombre || '')}</span><b>${cop(m.valor)}</b></div>`).join('')}</div>` : ''}
@@ -3706,7 +3736,7 @@ function buildDemo() {
       const tot = sum(items, l => l.cant * l.precio);
       ventas.push({ id: 'dv' + (i++), canal: 'final', fecha: f, estado: d < -5 ? 'Entregado' : pick(ESTADOS_FINAL), cliente: { nombre: pick(['Juan Pérez', 'Luz Marina Gómez', 'Carlos Restrepo', 'Ana Ochoa', 'Pedro Zuluaga']) + ' (ejemplo)', celular: '300 000 00' + int(10, 99), municipio: pick(['Rionegro', 'Guarne', 'La Ceja', 'El Carmen']), direccion: 'Vereda ejemplo' }, items, flete: pick([0, 80000, 120000]), costoFlete: pick([0, 60000, 90000]), pagos: d < -10 || rnd() < .5 ? [{ fecha: f, valor: tot }] : [] });
     }
-    if (d % 21 === -150 % 21) bbDespachos.push({ id: 'dd' + (i++), tipo: 'despacho', fecha: f, remision: 'BB-' + i, items: BBREF.map(([m, L]) => { const info = piezaInfo(m, L, DEFAULT_CONFIG); return { unidad: 'pieza', medida: m, largo: L, cant: int(8, 16), precio: listaPrecio(listas[0], m, L), rastras: +info.rastras.toFixed(6), costo: Math.round(info.costo) }; }) });
+    if (d % 21 === -150 % 21) bbDespachos.push({ id: 'dd' + (i++), tipo: 'despacho', fecha: f, remision: 'BB-' + i, items: BBREF.map(([m, L]) => { const info = piezaInfo(m, L, DEFAULT_CONFIG); return { unidad: 'pieza', medida: m, largo: L, cant: int(8, 16), rastras: +info.rastras.toFixed(6), costo: Math.round(info.costo) }; }) });
     if (d > -145 && rnd() < .4 && bbDespachos.length) {
       const last = bbDespachos[bbDespachos.length - 1];
       const items = Array.from({ length: int(1, 3) }, () => pick(last.items)).map(l => ({ ...l, cant: int(1, 4), pbb: l.precio, precio: Math.round(l.precio * (1.22 + rnd() * .12) / 100) * 100 }));
