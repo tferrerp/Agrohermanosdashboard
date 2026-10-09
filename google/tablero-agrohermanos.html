@@ -1718,7 +1718,17 @@ VIEW_FN.bb = R => {
   const enPunto = inv.filter(r => r.stock > 0);
   if (enPunto.length) {
     const est = estimadoInv(enPunto, p);
-    proyeccion = `<div class="note" style="margin-top:12px">Estimado si se vende todo a precio de venta al cliente final: venta ${cop(est.venta)}, utilidad de la sociedad ${signed(est.util)}, tu parte ${signed(est.miParte)}. Es solo un estimado: el precio real se pone en cada venta. ${avisoSinPrecio(est)}</div>`;
+    proyeccion = `<h4 class="ldg-h" style="margin-top:18px">Estimado del inventario: si se vende todo a precio de venta al cliente final</h4>
+    <div class="ledger">
+      <div><span>Venta estimada</span><b>${cop(est.venta)}</b></div>
+      <div><span>− Precio de sociedad (lo que entra la madera)</span><b>${cop(est.base)}</b></div>
+      <div><span>= Utilidad de la sociedad</span><b>${signed(est.util)}</b></div>
+      <div><span>Parte de ${esc(cfg.socio)} (${100 - p}%)</span><b>${signed(est.parteSocio)}</b></div>
+      <div><span>Tu parte (${p}%)</span><b>${signed(est.miParte)}</b></div>
+      <div><span>+ Lo que ganas en el precio de sociedad sobre tu costo real (${cop(est.costo, true)})</span><b>${signed(est.enPrecio)}</b></div>
+      <div class="total"><span>Tu utilidad estimada</span><b>${signed(est.miParte + est.enPrecio)}</b></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin:8px 0 0">Es solo un estimado: el precio real se pone en cada venta. ${avisoSinPrecio(est)}</p>`;
   }
   const liq = `<div class="ledger">
     <div><span>Venta en el punto</span><b>${cop(venta)}</b></div>
@@ -2367,16 +2377,19 @@ const pbbFor = (med, L) => listaPrecio(model().listaBB, med, L);
 // Precio de venta al cliente final: con él se estima lo que vale la madera despachada a Barro Blanco.
 const pvFor = (med, L) => listaPrecio(model().listaBBVenta, med, L);
 const estimadoBB = items => sum((items || []).filter(l => l.unidad !== 'rastra'), l => n(l.cant) * pvFor(l.medida, l.largo));
+// Estimado si se vende todo a precio de lista. La utilidad de la sociedad (venta − precio de sociedad) se reparte;
+// aparte, tú ganas la diferencia entre el precio de sociedad y tu costo real.
 function estimadoInv(rows, pct) {
-  let venta = 0, util = 0;
+  let venta = 0, util = 0, base = 0, costo = 0;
   const sinPv = new Set(), sinPb = new Set();
   for (const r of rows) {
     const q = Math.max(0, r.stock);
     if (!r.pv) { sinPv.add(r.nombre); continue; }
     venta += q * r.pv;
-    if (r.pbb) util += q * (r.pv - r.pbb); else sinPb.add(r.nombre);
+    if (r.pbb) { util += q * (r.pv - r.pbb); base += q * r.pbb; costo += q * n(r.costo); } else sinPb.add(r.nombre);
   }
-  return { venta, util, miParte: util * pct / 100, sinPv: [...sinPv], sinPb: [...sinPb] };
+  const miParte = util * pct / 100;
+  return { venta, util, base, costo, miParte, parteSocio: util - miParte, enPrecio: base - costo, sinPv: [...sinPv], sinPb: [...sinPb] };
 }
 // Dice cuáles piezas no tienen precio en la lista de venta o de sociedad, para que se sepa qué falta.
 const avisoSinPrecio = e => [
