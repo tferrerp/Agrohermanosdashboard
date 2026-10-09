@@ -254,6 +254,9 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .tbl.asig input, .dest .tbl input { width: 92px; height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); font-family: var(--f-mono); text-align: right; }
 .tbl.asig input:focus, .dest .tbl input:focus, .dest select:focus, .dest input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .rem-top { display: flex; align-items: center; gap: 14px; }
+.dest-precio { font-size: 12.5px; line-height: 1.45; color: var(--fg-2); padding: 8px 10px; border-radius: 8px; background: var(--accent-soft); }
+.asig-auto { display: inline-block; min-width: 92px; height: 32px; line-height: 32px; padding: 0 8px; border-radius: 7px; background: var(--sunken); font-family: var(--f-mono); text-align: right; color: var(--fg-2); box-sizing: border-box; }
+.asig-auto.neg { color: var(--crit); }
 /* Varias fotos de una remisión */
 .fotos { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; }
 .fotos .ft { position: relative; }
@@ -448,6 +451,8 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .panel > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: calc(18px + env(safe-area-inset-top, 0px)) 22px 14px; border-bottom: 1px solid var(--line); border-top: 3px solid var(--brand); }
 .panel > header h2 { font-size: 20px; font-weight: 600; font-variation-settings: "wdth" 110; margin-top: 4px; }
 .panel-b { flex: 1; overflow-y: auto; padding: 18px 22px 26px; display: flex; flex-direction: column; gap: 16px; }
+/* Que nada dentro del panel se aplaste (las tablas con scroll quedaban en cero de alto): el panel es el que hace scroll. */
+.panel-b > * { flex-shrink: 0; }
 .panel > footer { display: flex; gap: 8px; align-items: center; padding: 12px 22px calc(12px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); background: var(--surface-2); }
 .panel > footer .sp { flex: 1; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
@@ -3142,7 +3147,25 @@ function destNombre(d, M = model()) {
   if (d.tipo === 'pedido') { const p = M.porEntregar.find(x => x.id === d.pedidoId); return p ? p.cliente : 'Pedido'; }
   return 'Sin elegir';
 }
-// Precio sugerido de una pieza según a dónde va: sociedad para Barro Blanco, la lista del mayorista, la de clientes finales.
+// Con qué precios queda cada destino, dicho en palabras para el paso “Para quién”.
+function destPrecioInfo(d, M = model()) {
+  if (d.tipo === 'bb') return `Va sin precio: queda en el inventario de ${M.cfg.punto} con un valor estimado a precio de venta al cliente final. El precio se pone cuando ${M.cfg.socio} venda.`;
+  if (d.tipo === 'mayorista') { if (!d.clienteId) return ''; const L = M.listas.get(M.cli.get(d.clienteId)?.listaId); return L ? `Precios de la lista “${L.nombre}”. En el último paso los ves y los puedes cambiar.` : 'No tiene lista de precios: los escribes en el último paso.'; }
+  if (d.tipo === 'final') { if (!d.clienteId) return ''; const L = M.listas.get(M.cfg.listaFinal); return L ? `Precios de la lista “${L.nombre}”. En el último paso los puedes cambiar.` : 'Los precios los escribes en el último paso.'; }
+  if (d.tipo === 'pedido') return d.pedidoId ? 'Con los precios del pedido: se marca como entregado.' : '';
+  return '';
+}
+// Cuánto vale lo que se le asigna a un destino: a precio de su lista, estimado para Barro Blanco, o el total del pedido.
+function destValor(d, cants, W, M = model()) {
+  if (!d.tipo) return null;
+  if (d.tipo === 'pedido') { const p = M.porEntregar.find(x => x.id === d.pedidoId); return p ? { valor: p.calc.total } : null; }
+  const items = W.items.map((l, j) => ({ ...l, cant: n(cants[j]) })).filter(l => l.cant > 0);
+  if (d.tipo === 'bb') return { valor: estimadoBB(items), estimado: true };
+  let valor = 0, falta = 0;
+  for (const l of items) { const pr = destPrecio(d, l, M); if (pr) valor += l.cant * pr; else falta += l.cant; }
+  return { valor, falta };
+}
+// Precio sugerido de una pieza según a dónde va: la lista del mayorista o la de clientes finales. Barro Blanco va sin precio.
 function destPrecio(d, l, M = model()) {
   if (d.tipo === 'mayorista') return listaPrecio(M.listas.get(M.cli.get(d.clienteId)?.listaId), l.medida, l.largo) || 0;
   if (d.tipo === 'final') return listaPrecio(M.listas.get(M.cfg.listaFinal), l.medida, l.largo) || 0;
@@ -3150,10 +3173,16 @@ function destPrecio(d, l, M = model()) {
 }
 const remRastras = items => sum(items, l => n(l.cant) * n(l.rastras));
 const remNomina = ras => model().trab.map(t => [t.nombre, ras * tarifaTrab(t, { mo: moSnap() })]);
+// Al dividir, el destino 1 se queda con lo que no se le asignó a los demás.
+function remResto(W) {
+  if (W.modo !== 'varios' || !Array.isArray(W.asig) || !W.asig[0]) return;
+  W.items.forEach((l, j) => { W.asig[0][j] = n(l.cant) - sum(W.asig.slice(1), a => n(a[j])); });
+}
 function remAsigInit(W) {
   const ok = Array.isArray(W.asig) && W.asig.length === W.destinos.length && W.asig.every(a => a.length === W.items.length);
   if (!ok) W.asig = W.destinos.map((d, i) => W.items.map(l => i === 0 ? n(l.cant) : 0));
   if (W.modo === 'uno') W.asig = [W.items.map(l => n(l.cant))];
+  remResto(W);
 }
 const remStepper = W => `<ol class="stepper">${REM_PASOS.map((p, i) => `<li class="${i + 1 === W.step ? 'on' : i + 1 < W.step ? 'done' : ''}"><b>${i + 1 < W.step ? icon('check') : i + 1}</b><span>${p}</span></li>`).join('')}</ol>`;
 // Fotos de la remisión que se está cargando: se pueden subir varias (una por hoja o por parte).
@@ -3184,16 +3213,18 @@ function remRead(form, W) {
       if (el.querySelector('[data-rk="nombre"]')) d.nuevo = { nombre: g('nombre').trim(), celular: g('celular').trim(), municipio: g('municipio').trim(), direccion: g('direccion').trim() };
     }
     for (const inp of $$('[data-asig]', form)) { const [i, j] = inp.dataset.asig.split(':').map(Number); if (W.asig[i]) W.asig[i][j] = parseQty(inp.value); }
+    remResto(W);
   }
   if (W.step === 4) for (const inp of $$('[data-precio]', form)) { const [i, j] = inp.dataset.precio.split(':').map(Number); W.destinos[i].precios = { ...(W.destinos[i].precios || {}), [j]: parseMoney(inp.value) }; }
 }
-function remPaint() {
-  const F = FORMS.remision, W = S.form.rec, form = $('#form');
-  form.querySelector('.panel-b').innerHTML = `<div class="form-err" id="form-err" hidden></div>${F.body(W)}`;
+// Repinta el paso. Al cambiar de paso vuelve arriba; dentro del mismo paso (elegir destino, agregar o quitar) se queda donde estaba.
+function remPaint(quedarse = false) {
+  const F = FORMS.remision, W = S.form.rec, form = $('#form'), pb = form.querySelector('.panel-b'), y = pb.scrollTop;
+  pb.innerHTML = `<div class="form-err" id="form-err" hidden></div>${F.body(W)}`;
   $('#f-submit', form).textContent = F.cta(W);
   const back = $('[data-act="rem-back"]', form); if (back) back.hidden = W.step <= 1;
   recalcForm(); cargarMiniaturas();
-  form.querySelector('.panel-b').scrollTop = 0;
+  pb.scrollTop = quedarse ? y : 0;
 }
 function remIr(step) { const W = S.form.rec; W.step = step; remPaint(); }
 
@@ -3274,22 +3305,29 @@ function remBody(W) {
       <div class="dest-h"><span class="dest-n">${W.modo === 'varios' ? `Destino ${i + 1}` : 'Destino'}</span>${W.modo === 'varios' && W.destinos.length > 1 ? `<button type="button" class="icon-btn" data-act="rem-rm-dest" data-i="${i}" aria-label="Quitar destino">${icon('x')}</button>` : ''}</div>
       <div class="form-grid">
         <div class="field full"><label>Va para</label><select data-rk="tipo">${DEST_TIPOS.map(([v, l]) => `<option value="${v}"${d.tipo === v ? ' selected' : ''}>${l}</option>`).join('')}</select></div>
-        ${d.tipo === 'mayorista' ? `<div class="field full"><label>Mayorista</label><select data-rk="cliente">${[['', 'Elige…'], ...mays].map(([v, l]) => `<option value="${esc(v)}"${d.clienteId === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>${d.clienteId ? `<span class="hint">Precios: ${esc(M.listas.get(M.cli.get(d.clienteId)?.listaId)?.nombre || 'sin lista, los escribes en el siguiente paso')}</span>` : ''}</div>` : ''}
+        ${d.tipo === 'mayorista' ? `<div class="field full"><label>Mayorista</label><select data-rk="cliente">${[['', 'Elige…'], ...mays].map(([v, l]) => `<option value="${esc(v)}"${d.clienteId === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>` : ''}
         ${d.tipo === 'final' ? `<div class="field full"><label>Cliente final</label><select data-rk="cliente">${[['', 'Elige…'], ...fins, ['__nuevo', '+ Cliente nuevo']].map(([v, l]) => `<option value="${esc(v)}"${d.clienteId === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select></div>
           ${d.clienteId === '__nuevo' ? `<div class="field"><label>Nombre</label><input data-rk="nombre" value="${esc(d.nuevo?.nombre || '')}" placeholder="Nombre y apellido"></div><div class="field"><label>Celular</label><input data-rk="celular" inputmode="tel" value="${esc(d.nuevo?.celular || '')}" placeholder="300 000 0000"></div><div class="field"><label>Municipio</label><input data-rk="municipio" value="${esc(d.nuevo?.municipio || '')}" placeholder="Guarne, Rionegro…"></div><div class="field"><label>Dirección de entrega</label><input data-rk="direccion" value="${esc(d.nuevo?.direccion || '')}" placeholder="Vereda, finca, obra"></div>` : ''}` : ''}
         ${d.tipo === 'pedido' ? `<div class="field full"><label>Pedido por entregar</label>${peds.length ? `<select data-rk="pedido">${[['', 'Elige…'], ...peds].map(([v, l]) => `<option value="${esc(v)}"${d.pedidoId === v ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select><span class="hint">Se marca como entregado con la fecha de esta remisión.</span>` : '<span class="hint">No hay pedidos por entregar.</span>'}</div>` : ''}
-      </div></div>`).join('');
+      </div>${destPrecioInfo(d, M) ? `<div class="dest-precio">${esc(destPrecioInfo(d, M))}</div>` : ''}</div>`).join('');
     if (W.modo === 'varios') {
       h += `<div>${btn(`${icon('plus')}Agregar destino`, 'data-act="rem-add-dest"', 'sm')}</div>
-        <div class="form-sec"><h4>¿Cuánto va para cada uno?</h4><span class="muted" style="font-size:11.5px">La última columna debe quedar en 0</span></div>
-        <div class="tbl-wrap"><table class="tbl asig"><thead><tr><th>Pieza</th><th class="r">Total</th>${W.destinos.map((d, i) => `<th class="r nt">${esc(destNombre(d, M))}</th>`).join('')}<th class="r">Sin asignar</th></tr></thead><tbody>
-        ${W.items.map((l, j) => `<tr><td>${esc(nomLinea(l))}</td><td class="r">${num(l.cant, 0)}</td>${W.destinos.map((d, i) => `<td class="r"><input class="qty" inputmode="decimal" data-asig="${i}:${j}" value="${esc(qtyIn(W.asig[i][j]))}" placeholder="0" aria-label="${esc(nomLinea(l))} para ${esc(destNombre(d, M))}"></td>`).join('')}<td class="r" data-rest="${j}">0</td></tr>`).join('')}
-        </tbody></table></div>`;
+        <div class="form-sec"><h4>¿Cuántas piezas van para cada uno?</h4></div>
+        <div class="note">Escribe en la columna de cada destino cuántas piezas de cada medida le van. Lo que no le pongas a nadie se queda en <b>${esc(destNombre(W.destinos[0], M))}</b> (destino 1): esa columna se llena sola.</div>
+        <div class="tbl-wrap"><table class="tbl asig"><thead><tr><th>Pieza</th><th class="r">Total</th>${W.destinos.map((d, i) => `<th class="r nt">${esc(destNombre(d, M))}${i === 0 ? '<span class="sub">lo que queda</span>' : ''}</th>`).join('')}</tr></thead><tbody>
+        ${W.items.map((l, j) => `<tr><td>${esc(nomLinea(l))}</td><td class="r">${num(l.cant, 0)}</td>${W.destinos.map((d, i) => i === 0
+          ? `<td class="r"><span class="asig-auto" data-auto0="${j}">${num(W.asig[0][j], 0)}</span></td>`
+          : `<td class="r"><input class="qty" inputmode="decimal" data-asig="${i}:${j}" value="${esc(qtyIn(W.asig[i][j]))}" placeholder="0" aria-label="${esc(nomLinea(l))} para ${esc(destNombre(d, M))}"></td>`).join('')}</tr>`).join('')}
+        </tbody><tfoot>
+          <tr><td>Piezas</td><td class="r">${num(sum(W.items, l => l.cant), 0)}</td>${W.destinos.map((d, i) => `<td class="r" data-tp="${i}"></td>`).join('')}</tr>
+          <tr><td>Valor</td><td></td>${W.destinos.map((d, i) => `<td class="r" data-tv="${i}"></td>`).join('')}</tr>
+        </tfoot></table></div>`;
     }
     return h + '<div id="live"></div>';
   }
   // Paso 4: precios y confirmar
-  let h = `${remStepper(W)}<div class="rem-top">${remFotoPrev()}<div><b>${W.numero ? `Remisión ${esc(W.numero)}` : 'Remisión sin número'}</b><span class="muted" style="display:block;font-size:12.5px">${fmtDate(W.fecha)} · ${num(sum(W.items, l => l.cant), 0)} piezas · ${num(remRastras(W.items))} rastras</span></div></div>`;
+  let h = `${remStepper(W)}<div class="rem-top">${remFotoPrev()}<div><b>${W.numero ? `Remisión ${esc(W.numero)}` : 'Remisión sin número'}</b><span class="muted" style="display:block;font-size:12.5px">${fmtDate(W.fecha)} · ${num(sum(W.items, l => l.cant), 0)} piezas · ${num(remRastras(W.items))} rastras</span></div></div>
+    ${W.destinos.some(d => d.tipo === 'mayorista' || d.tipo === 'final') ? '<div class="note">Revisa el precio de cada pieza: sale de la lista de cada cliente. Si se vendió a otro precio, cámbialo aquí.</div>' : ''}`;
   h += W.destinos.map((d, i) => {
     const lines = W.items.map((l, j) => ({ l, j, cant: n(W.asig[i][j]) })).filter(x => x.cant > 0);
     if (d.tipo === 'pedido') {
@@ -3319,18 +3357,18 @@ function remBody(W) {
 FORMS['remision'] = {
   eyebrow: 'Remisiones', title: 'Nueva remisión de cargue', done: 'Remisión guardada',
   init: () => { remFotosLimpiar(); return { step: 1, fecha: todayStr(), numero: '', items: [], modo: '', destinos: [{ tipo: '' }], asig: [] }; },
-  cta: W => W.step === 1 ? (remFotos().length && S.sample && S.sampleImg ? `Leer ${remFotos().length === 1 ? 'la foto' : `las ${remFotos().length} fotos`} con Claude` : 'Siguiente') : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? 'Revisar y confirmar' : 'Guardar remisión',
+  cta: W => W.step === 1 ? (remFotos().length && S.sample && S.sampleImg ? `Leer ${remFotos().length === 1 ? 'la foto' : `las ${remFotos().length} fotos`} con Claude` : 'Siguiente') : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? (W.destinos.some(d => d.tipo === 'mayorista' || d.tipo === 'final') ? 'Siguiente: precios' : 'Siguiente: confirmar') : 'Guardar remisión',
   foot: W => `<button type="button" class="btn" data-act="rem-back"${W.step > 1 ? '' : ' hidden'}>Atrás</button>`,
   body: W => remBody(W),
   onChange: (t, f) => {
     if (t.id === 'f-rem-foto' && t.files && t.files.length) {
       remRead(f, S.form.rec);
       const antes = remFotos().length, pedidas = t.files.length;
-      remAgregarFotos(t.files); remPaint();
+      remAgregarFotos(t.files); remPaint(true);
       if (antes + pedidas > REM_MAX_FOTOS) formError(`Máximo ${REM_MAX_FOTOS} fotos por remisión.`);
       return;
     }
-    if (t.matches('select[data-rk]')) { remRead(f, S.form.rec); remPaint(); }
+    if (t.matches('select[data-rk]')) { remRead(f, S.form.rec); remPaint(true); }
   },
   live: form => {
     const W = S.form.rec;
@@ -3345,11 +3383,17 @@ FORMS['remision'] = {
       return totalsBox([['Piezas', num(pzs, 0)], ['Rastras', num(ras, 3), 1], ...remNomina(ras).map(([nm, v]) => [`Nómina de ${esc(nm)}`, cop(v)])]);
     }
     if (W.step === 3 && W.modo === 'varios') {
-      const rest = W.items.map(l => n(l.cant));
-      for (const inp of $$('[data-asig]', form)) { const [, j] = inp.dataset.asig.split(':').map(Number); rest[j] -= parseQty(inp.value); }
-      rest.forEach((r, j) => { const c = $(`[data-rest="${j}"]`, form); if (c) { c.textContent = num(r, 0); c.className = `r ${Math.abs(r) > 0.001 ? 'neg' : 'pos'}`; } });
-      const falta = sum(rest, r => Math.abs(r));
-      return falta > 0.001 ? `<div class="note">Faltan ${num(falta, 0)} piezas por asignar.</div>` : '<div class="note">Todo asignado.</div>';
+      const M = model(), asig = W.destinos.map(() => W.items.map(() => 0));
+      for (const inp of $$('[data-asig]', form)) { const [i, j] = inp.dataset.asig.split(':').map(Number); if (asig[i]) asig[i][j] = parseQty(inp.value); }
+      W.items.forEach((l, j) => { asig[0][j] = n(l.cant) - sum(asig.slice(1), a => a[j]); });
+      asig[0].forEach((v, j) => { const c = $(`[data-auto0="${j}"]`, form); if (c) { c.textContent = num(v, 0); c.classList.toggle('neg', v < -0.001); } });
+      W.destinos.forEach((d, i) => {
+        const tp = $(`[data-tp="${i}"]`, form), tv = $(`[data-tv="${i}"]`, form), v = destValor(d, asig[i], W, M);
+        if (tp) tp.textContent = num(sum(asig[i], x => x), 0);
+        if (tv) tv.innerHTML = !v ? '<span class="muted">—</span>' : `${cop(v.valor)}${v.estimado ? '<span class="sub">estimado</span>' : v.falta ? `<span class="sub">${num(v.falta, 0)} pzs sin precio</span>` : ''}`;
+      });
+      const pasadas = W.items.filter((l, j) => asig[0][j] < -0.001);
+      return pasadas.length ? `<div class="note neg">Asignaste más piezas de las que hay en: ${pasadas.map(l => esc(nomLinea(l))).join(', ')}.</div>` : '';
     }
     if (W.step === 4) {
       let total = 0, est = 0;
@@ -3394,11 +3438,18 @@ FORMS['remision'] = {
       const peds = W.destinos.filter(d => d.tipo === 'pedido').map(d => d.pedidoId);
       if (new Set(peds).size !== peds.length) { formError('El mismo pedido está dos veces.'); return; }
       remAsigInit(W);
-      const rest = W.items.map((l, j) => n(l.cant) - sum(W.asig, a => a[j]));
-      if (rest.some(r => Math.abs(r) > 0.001)) { formError('Reparte todas las piezas: la columna “Sin asignar” debe quedar en 0.'); return; }
+      const pasadas = W.items.filter((l, j) => W.asig[0][j] < -0.001);
+      if (pasadas.length) { formError(`Asignaste más piezas de las que hay en: ${pasadas.map(nomLinea).join(', ')}.`); return; }
       if (W.asig.some(a => a.some(x => x < 0))) { formError('Hay cantidades negativas.'); return; }
       W.destinos.forEach((d, i) => { if (d.tipo !== 'pedido' && !W.asig[i].some(x => x > 0)) d.vacio = true; else delete d.vacio; });
-      if (W.destinos.some(d => d.vacio)) { formError('Hay un destino sin piezas: quítalo o asígnale piezas.'); return; }
+      const vacio = W.destinos.findIndex(d => d.vacio);
+      if (vacio >= 0) {
+        formError(vacio === 0 ? `A ${destNombre(W.destinos[0])} (destino 1) no le quedó ninguna pieza: quítalo o bájale piezas a los otros destinos.` : `A ${destNombre(W.destinos[vacio])} no le asignaste piezas: en la tabla de abajo escribe en su columna cuántas le van, o quítalo.`);
+        // Lleva a la columna de ese destino en la tabla de reparto.
+        const ir = $(vacio === 0 ? '.tbl.asig' : `[data-asig="${vacio}:0"]`, form);
+        if (ir) { ir.scrollIntoView({ block: 'center', behavior: 'smooth' }); if (vacio) ir.focus({ preventScroll: true }); }
+        return;
+      }
       remIr(4); return;
     }
     // Paso 4: guardar
@@ -3852,12 +3903,12 @@ document.addEventListener('click', e => {
     case 'cli-menu': cliMenu(t); break;
     case 'trab': openForm('trabajador', { id: t.dataset.id }); break;
     case 'ver-foto': verFoto(t); break;
-    case 'rem-quitar-foto': { const W = S.form.rec; remRead($('#form'), W); const [f] = remFotos().splice(+t.dataset.i, 1); if (f) URL.revokeObjectURL(f.url); remPaint(); break; }
+    case 'rem-quitar-foto': { const W = S.form.rec; remRead($('#form'), W); const [f] = remFotos().splice(+t.dataset.i, 1); if (f) URL.revokeObjectURL(f.url); remPaint(true); break; }
     case 'rem-manual': { const W = S.form.rec; remRead($('#form'), W); if (!W.items.length) W.items = [{}]; remIr(2); break; }
     case 'rem-back': { const W = S.form.rec; remRead($('#form'), W); formError(''); remIr(Math.max(1, W.step - 1)); break; }
-    case 'rem-modo': { const W = S.form.rec; remRead($('#form'), W); W.modo = t.dataset.m; if (W.modo === 'uno') W.destinos = [W.destinos[0] || { tipo: '' }]; W.asig = []; remPaint(); break; }
-    case 'rem-add-dest': { const W = S.form.rec; remRead($('#form'), W); W.destinos.push({ tipo: '' }); W.asig.push(W.items.map(() => 0)); remPaint(); break; }
-    case 'rem-rm-dest': { const W = S.form.rec; remRead($('#form'), W); const i = +t.dataset.i; W.destinos.splice(i, 1); W.asig.splice(i, 1); remPaint(); break; }
+    case 'rem-modo': { const W = S.form.rec; remRead($('#form'), W); W.modo = t.dataset.m; if (W.modo === 'uno') W.destinos = [W.destinos[0] || { tipo: '' }]; W.asig = []; remPaint(true); break; }
+    case 'rem-add-dest': { const W = S.form.rec; remRead($('#form'), W); W.destinos.push({ tipo: '' }); W.asig.push(W.items.map(() => 0)); remPaint(true); break; }
+    case 'rem-rm-dest': { const W = S.form.rec; remRead($('#form'), W); const i = +t.dataset.i; W.destinos.splice(i, 1); W.asig.splice(i, 1); remPaint(true); break; }
     case 'cerrar-foto': cerrarFoto(); break;
     case 'edit': openEdit(t.dataset.col, t.dataset.id); break;
     case 'close': closeForm(); break;
