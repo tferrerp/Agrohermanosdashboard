@@ -1703,7 +1703,7 @@ VIEW_FN.bb = R => {
   const enPunto = inv.filter(r => r.stock > 0);
   if (enPunto.length) {
     const est = estimadoInv(enPunto, p);
-    proyeccion = `<div class="note" style="margin-top:12px">Estimado si se vende todo a precio de venta al cliente final: venta ${cop(est.venta)}, utilidad de la sociedad ${signed(est.util)}, tu parte ${signed(est.miParte)}. Es solo un estimado: el precio real se pone en cada venta.${est.sinPv ? ` ${est.sinPv === 1 ? 'Una medida no tiene' : `${est.sinPv} medidas no tienen`} precio en la lista de venta: no ${est.sinPv === 1 ? 'entra' : 'entran'} en el estimado.` : ''}${est.sinPb ? ` ${est.sinPb === 1 ? 'Una medida no tiene' : `${est.sinPb} medidas no tienen`} precio de sociedad todavía: no ${est.sinPb === 1 ? 'entra' : 'entran'} en la utilidad.` : ''}</div>`;
+    proyeccion = `<div class="note" style="margin-top:12px">Estimado si se vende todo a precio de venta al cliente final: venta ${cop(est.venta)}, utilidad de la sociedad ${signed(est.util)}, tu parte ${signed(est.miParte)}. Es solo un estimado: el precio real se pone en cada venta. ${avisoSinPrecio(est)}</div>`;
   }
   const liq = `<div class="ledger">
     <div><span>Venta en el punto</span><b>${cop(venta)}</b></div>
@@ -2353,15 +2353,21 @@ const pbbFor = (med, L) => listaPrecio(model().listaBB, med, L);
 const pvFor = (med, L) => listaPrecio(model().listaBBVenta, med, L);
 const estimadoBB = items => sum((items || []).filter(l => l.unidad !== 'rastra'), l => n(l.cant) * pvFor(l.medida, l.largo));
 function estimadoInv(rows, pct) {
-  let venta = 0, util = 0, sinPv = 0, sinPb = 0;
+  let venta = 0, util = 0;
+  const sinPv = new Set(), sinPb = new Set();
   for (const r of rows) {
     const q = Math.max(0, r.stock);
-    if (!r.pv) { sinPv++; continue; }
+    if (!r.pv) { sinPv.add(r.nombre); continue; }
     venta += q * r.pv;
-    if (r.pbb) util += q * (r.pv - r.pbb); else sinPb++;
+    if (r.pbb) util += q * (r.pv - r.pbb); else sinPb.add(r.nombre);
   }
-  return { venta, util, miParte: util * pct / 100, sinPv, sinPb };
+  return { venta, util, miParte: util * pct / 100, sinPv: [...sinPv], sinPb: [...sinPb] };
 }
+// Dice cuáles piezas no tienen precio en la lista de venta o de sociedad, para que se sepa qué falta.
+const avisoSinPrecio = e => [
+  e.sinPv.length ? `Sin precio en la lista de venta (no entra${e.sinPv.length > 1 ? 'n' : ''} en el estimado): <b>${e.sinPv.map(esc).join(', ')}</b>.` : '',
+  e.sinPb.length ? `Sin precio de sociedad todavía (no entra${e.sinPb.length > 1 ? 'n' : ''} en la utilidad estimada): <b>${e.sinPb.map(esc).join(', ')}</b>.` : '',
+].filter(Boolean).join(' ');
 function autoPrice(form, row) {
   const F = FORMS[S.form.kind];
   const med = row.querySelector('[data-k="medida"]').value, L = parseQty(row.querySelector('[data-k="largo"]').value);
@@ -2399,8 +2405,9 @@ function liveDesp(form) {
     ras += l.cant * l.rastras; costo += l.cant * l.costo;
     if (l.unidad === 'rastra') { s.textContent = `${num(l.cant, 3)} rastras sin detalle · sin estimado`; continue; }
     const pv = pvFor(l.medida, l.largo);
-    rows.push({ stock: l.cant, pv, pbb: pbbFor(l.medida, l.largo) });
-    s.textContent = `${num(l.rastras, 4)} rastras/pza · ${pv ? `estimado ${cop(pv)} c/u a precio de venta · ${cop(l.cant * pv)}` : 'sin precio en la lista de venta'}`;
+    const pbb = pbbFor(l.medida, l.largo);
+    rows.push({ stock: l.cant, pv, pbb, nombre: itemName(l) });
+    s.textContent = `${num(l.rastras, 4)} rastras/pza · ${pv ? `estimado ${cop(pv)} c/u a precio de venta · ${cop(l.cant * pv)}${pbb ? '' : ' · sin precio de sociedad'}` : 'sin precio en la lista de venta'}`;
   }
   return { pzs, ras, costo, est: estimadoInv(rows, n(CFG().pctSocio)) };
 }
@@ -2584,10 +2591,10 @@ const despForm = tipo => ({
     </div><div id="live"></div>${datalistMedidas(model())}`,
   live: form => {
     const t = liveDesp(form), p = n(CFG().pctSocio), e = t.est;
-    const avisos = [e.sinPv ? `${e.sinPv === 1 ? 'Una medida no tiene' : `${e.sinPv} medidas no tienen`} precio en la lista de venta: no ${e.sinPv === 1 ? 'entra' : 'entran'} en el estimado.` : '', e.sinPb ? `${e.sinPb === 1 ? 'Una medida no tiene' : `${e.sinPb} medidas no tienen`} precio de sociedad todavía: no ${e.sinPb === 1 ? 'entra' : 'entran'} en la utilidad estimada.` : ''].filter(Boolean);
+    const aviso = avisoSinPrecio(e);
     return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], [tipo === 'devolucion' ? 'Valor estimado que sale del punto' : 'Valor estimado (a precio de venta)', cop(e.venta), 1],
       ...(tipo === 'devolucion' ? [] : [['Utilidad estimada de la sociedad', signed(e.util)], [`Tu parte estimada (${num(p, 0)}%)`, signed(e.miParte)]]),
-      ['Tu costo real', cop(t.costo)]]) + (avisos.length ? `<div class="note">${avisos.join(' ')}</div>` : '');
+      ['Tu costo real', cop(t.costo)]]) + (aviso ? `<div class="note">${aviso}</div>` : '');
   },
   // El despacho no guarda precio: el precio se pone en la venta.
   read: (f, r) => ({ ...r, ...(tipo === 'devolucion' ? { motivo: val(f, 'f-motivo'), motivoDetalle: val(f, 'f-motivo-det') } : { mo: r.mo || moSnap() }), tipo, fecha: val(f, 'f-fecha'), remision: val(f, 'f-remision'), items: readLines(f, 'desp').map(({ precio, ...l }) => l), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota') }),
