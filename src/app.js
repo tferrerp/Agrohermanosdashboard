@@ -1510,10 +1510,10 @@ VIEW_FN.nomina = R => {
 
 VIEW_FN.remisiones = R => {
   const M = model();
-  const head = `<div class="section-h"><p>Cada cargue que sale del aserrío. Sube la foto de la remisión: Claude saca el despiece, tú lo confirmas y dices para quién es (uno solo o repartido entre varios). Se cargan solas las ventas, los despachos a Barro Blanco y la nómina de ese viaje.</p>
+  const head = `<div class="section-h"><p>Cada cargue que sale del aserrío. Sube las fotos de la remisión (una o varias): Claude saca el despiece, tú lo confirmas y dices para quién es (uno solo o repartido entre varios). Se cargan solas las ventas, los despachos a Barro Blanco y la nómina de ese viaje.</p>
     <div class="acts">${addBtn('Subir remisión', 'remision', 'primary')}</div></div>`;
   const all = M.d.remisiones.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '') || (b.creado || '').localeCompare(a.creado || ''));
-  if (!all.length) return head + card('', `<div class="hero-empty">${icon('remision')}<b>Sube la primera remisión</b><p>Toma la foto cuando el camión esté cargado. En cuatro pasos queda registrado a quién se le despachó, cuánto vale y cuánto se le debe a cada trabajador.</p>${addBtn('Subir remisión', 'remision', 'primary')}</div>`);
+  if (!all.length) return head + card('', `<div class="hero-empty">${icon('remision')}<b>Sube la primera remisión</b><p>Toma las fotos cuando el camión esté cargado. En cuatro pasos queda registrado a quién se le despachó, cuánto vale y cuánto se le debe a cada trabajador.</p>${addBtn('Subir remisión', 'remision', 'primary')}</div>`);
   const E = all.filter(r => inR(r.fecha, R));
   const nom = rid => sum(M.nominaMovs.filter(m => m.col === 'remisiones' && m.id === rid && m.tipo === 'devengo'), m => m.valor);
   const kp = `<div class="kpis">
@@ -1524,14 +1524,14 @@ VIEW_FN.remisiones = R => {
   </div>`;
   const t = table([
     { h: 'Fecha', f: r => `<span class="num">${fmtDate(r.fecha)}</span>` },
-    { h: 'Remisión', f: r => `<div class="thumb-row" style="margin:0">${fotoThumb(r, 'remisión')}<span class="cell-strong">${esc(r.numero || 'Sin número')}</span></div>` },
+    { h: 'Remisión', f: r => { const fs = fotosDe(r); return `<div class="thumb-row" style="margin:0">${fs.length ? fotoThumb(fs[0], 'remisión') : ''}${fs.length > 1 ? `<span class="muted">+${fs.length - 1}</span>` : ''}<span class="cell-strong">${esc(r.numero || 'Sin número')}</span></div>`; } },
     { h: 'Para quién', f: r => `<div class="pills">${(r.destinos || []).map(x => chip(x.tipo === 'bb' ? 'wood' : x.convertido ? 'good' : '', x.nombre)).join('')}</div>` },
     { h: 'Piezas', r: 1, f: r => num(r.piezas, 0) },
     { h: 'Rastras', r: 1, f: r => num(r.rastras) },
     { h: 'Valor', r: 1, f: r => cop(r.valor) },
     { h: 'Nómina', r: 1, f: r => cop(nom(r.id)) },
   ], E, { act: r => editAttr('remisiones', r.id), empty: '<p>No hay remisiones en este período.</p>' });
-  return `${head}${kp}${card('Remisiones', t, { sub: 'Toca una para ver la foto, el despiece y a quién se le despachó.', acts: addBtn('Subir remisión', 'remision') })}`;
+  return `${head}${kp}${card('Remisiones', t, { sub: 'Toca una para ver las fotos, el despiece y a quién se le despachó.', acts: addBtn('Subir remisión', 'remision') })}`;
 };
 
 // Tabla de costo por rastra según el largo (pinera + mano de obra).
@@ -2550,7 +2550,7 @@ function prefillDe(ds, kind) {
    Guarda la remisión y crea (o entrega) los pedidos y despachos de cada destino; la nómina sale de ahí.
    ========================================================================= */
 const DEST_TIPOS = [['', 'Elige…'], ['bb', 'Barro Blanco (despacho al punto)'], ['mayorista', 'Un mayorista'], ['final', 'Un cliente final'], ['pedido', 'Un pedido que estaba por entregar']];
-const REM_PASOS = ['Foto', 'Despiece', 'Para quién', 'Confirmar'];
+const REM_PASOS = ['Fotos', 'Despiece', 'Para quién', 'Confirmar'];
 const nomLinea = l => l.unidad === 'rastra' ? `Rastras de ${num(l.largo)} m` : `${l.medida} × ${num(l.largo)} m`;
 const remPedidos = () => model().porEntregar;
 function destNombre(d, M = model()) {
@@ -2574,7 +2574,18 @@ function remAsigInit(W) {
   if (W.modo === 'uno') W.asig = [W.items.map(l => n(l.cant))];
 }
 const remStepper = W => `<ol class="stepper">${REM_PASOS.map((p, i) => `<li class="${i + 1 === W.step ? 'on' : i + 1 < W.step ? 'done' : ''}"><b>${i + 1 < W.step ? icon('check') : i + 1}</b><span>${p}</span></li>`).join('')}</ol>`;
-const remFotoPrev = () => S.remFotoUrl ? `<button type="button" class="thumb big" data-act="ver-foto" data-src="${esc(S.remFotoUrl)}" aria-label="Ver la foto de la remisión"><img src="${esc(S.remFotoUrl)}" alt="Foto de la remisión"></button>` : '';
+// Fotos de la remisión que se está cargando: se pueden subir varias (una por hoja o por parte).
+const REM_MAX_FOTOS = 10;
+const remFotos = () => S.remFotos || (S.remFotos = []);
+function remFotosLimpiar() { for (const f of remFotos()) URL.revokeObjectURL(f.url); S.remFotos = []; }
+function remAgregarFotos(files) {
+  const F = remFotos(), nuevas = [...files].filter(f => /^image\//.test(f.type) || !f.type);
+  for (const file of nuevas.slice(0, Math.max(0, REM_MAX_FOTOS - F.length))) F.push({ file, url: URL.createObjectURL(file) });
+}
+const remFotoBtn = (f, i, cls = 'thumb big') => `<button type="button" class="${cls}" data-act="ver-foto" data-src="${esc(f.url)}" aria-label="Ver la foto ${i + 1}"><img src="${esc(f.url)}" alt="Foto ${i + 1} de la remisión"></button>`;
+const remFotoPrev = () => { const F = remFotos(); return !F.length ? '' : F.length === 1 ? remFotoBtn(F[0], 0) : `<div class="fotos mini">${F.map((f, i) => remFotoBtn(f, i, 'thumb')).join('')}</div>`; };
+// Fotos guardadas de una remisión: la lista nueva o la foto sola de antes.
+const fotosDe = r => Array.isArray(r.fotos) && r.fotos.length ? r.fotos : tieneFoto(r) ? [r] : [];
 
 // Lee lo que está en pantalla antes de cambiar de paso o repintar.
 function remRead(form, W) {
@@ -2604,43 +2615,62 @@ function remPaint() {
 }
 function remIr(step) { const W = S.form.rec; W.step = step; remPaint(); }
 
-const remPrompt = () => [
-  'Lee la foto de una remisión de cargue de madera de Agrohermanos (Antioquia, Colombia): lo que se subió al camión.',
+const remPrompt = (nFotos = 1, parte = false) => [
+  nFotos > 1
+    ? `Lee estas ${nFotos} fotos de una remisión de cargue de madera de Agrohermanos (Antioquia, Colombia): lo que se subió al camión. Son hojas o partes de la misma remisión${parte ? ' (y hay más fotos que se leen aparte)' : ''}: junta el despiece de todas en una sola lista. Si la misma hoja sale en dos fotos, cuéntala una sola vez.`
+    : `Lee la foto de una remisión de cargue de madera de Agrohermanos (Antioquia, Colombia): lo que se subió al camión.${parte ? ' Es parte de una remisión con más fotos que se leen aparte.' : ''}`,
   `Hoy es ${todayStr()}. Escribe las fechas como AAAA-MM-DD.`,
   'Medidas en pulgadas "ancho x grueso" (ej. "4x6"). Largo en metros (ej. 3 o 4.5; "6,50", "6.5" y "650" son 6.5 m). Cantidad en piezas.',
   'Si la remisión dice para quién va (un cliente, Barro Blanco, Fermín, San Nicolás…), ponlo en "destino". Si hay partes para clientes distintos, explícalo en "nota".',
   'Responde solo JSON: {"fecha":"","numero":"","destino":"","items":[{"medida":"4x6","largo":3,"cant":10}],"nota":""}',
   'No inventes nada: deja vacío lo que no se lea.',
 ].join('\n');
-async function remLeerFoto(file) {
-  const W = S.form.rec, st = $('#foto-status');
-  if (S.remFotoUrl) URL.revokeObjectURL(S.remFotoUrl);
-  S.remFoto = file; S.remFotoUrl = URL.createObjectURL(file);
-  if (!S.sample || !S.sampleImg) { W.items = W.items.length ? W.items : [{}]; remIr(2); return; }
-  if (st) { st.hidden = false; st.textContent = 'Claude está leyendo la remisión y sacando el despiece…'; }
+async function remLeerFotos() {
+  const W = S.form.rec, st = $('#foto-status'), b = $('#f-submit');
+  const files = remFotos().map(f => f.file), max = Math.max(1, n(S.sampleImg.maxCount) || files.length);
+  if (st) { st.hidden = false; st.textContent = files.length > 1 ? `Claude está leyendo las ${files.length} fotos y sacando el despiece…` : 'Claude está leyendo la remisión y sacando el despiece…'; }
+  if (b) b.disabled = true;
   const ctl = new AbortController(); S.aiCtl = ctl;
   try {
-    const out = await S.sample.json(remPrompt(), { signal: ctl.signal, cache: false, images: [file] });
-    const items = aiItems(out && out.items, false).map(l => { const info = piezaInfo(l.medida, l.largo); return info ? { unidad: 'pieza', medida: info.label, largo: l.largo, cant: l.cant, rastras: +info.rastras.toFixed(6), costo: Math.round(info.costo) } : { medida: l.medida, largo: l.largo, cant: l.cant }; });
-    if (isDate(out && out.fecha)) W.fecha = out.fecha;
-    if (out && out.numero) W.numero = String(out.numero);
+    const items = [], notas = [];
+    let fecha = '', numero = '';
+    for (let i = 0; i < files.length; i += max) {
+      const lote = files.slice(i, i + max);
+      const out = await S.sample.json(remPrompt(lote.length, files.length > max), { signal: ctl.signal, cache: false, images: lote });
+      items.push(...aiItems(out && out.items, false).map(l => { const info = piezaInfo(l.medida, l.largo); return info ? { unidad: 'pieza', medida: info.label, largo: l.largo, cant: l.cant, rastras: +info.rastras.toFixed(6), costo: Math.round(info.costo) } : { medida: l.medida, largo: l.largo, cant: l.cant }; }));
+      if (!fecha && isDate(out && out.fecha)) fecha = out.fecha;
+      if (!numero && out && out.numero) numero = String(out.numero);
+      if (out && out.destino) notas.push(`Dice que va para: ${out.destino}.`);
+      if (out && out.nota) notas.push(out.nota);
+    }
+    if (fecha) W.fecha = fecha;
+    if (numero) W.numero = numero;
     W.items = items.length ? items : [{}];
-    W.notaIA = [out && out.destino ? `Dice que va para: ${out.destino}.` : '', out && out.nota ? out.nota : ''].filter(Boolean).join(' ');
+    W.notaIA = [...new Set(notas)].join(' ');
     S.aiCtl = null;
     remIr(2);
   } catch (e) {
     if (st) st.textContent = e && e.code === 'cancelled' ? '' : `${aiErr(e)} Puedes llenarla a mano.`;
-  } finally { if (S.aiCtl === ctl) S.aiCtl = null; }
+  } finally {
+    if (S.aiCtl === ctl) S.aiCtl = null;
+    if (b) b.disabled = false;
+  }
 }
 
 function remBody(W) {
   const M = model();
-  if (W.step === 1) return `${remStepper(W)}
-    <label class="drop" for="f-rem-foto">${icon('up')}<b>Sube la foto de la remisión</b><span>${S.sample && S.sampleImg ? 'Claude saca el despiece: medidas, largos y cantidades.' : 'Se guarda con la remisión y llenas el despiece a mano.'}</span></label>
-    <input id="f-rem-foto" type="file" accept="image/*" class="sr-only">
+  if (W.step === 1) {
+    const F = remFotos(), ia = S.sample && S.sampleImg;
+    const fotos = F.length
+      ? `<div class="fotos">${F.map((f, i) => `<div class="ft">${remFotoBtn(f, i)}<button type="button" class="x" data-act="rem-quitar-foto" data-i="${i}" aria-label="Quitar la foto ${i + 1}">${icon('x')}</button></div>`).join('')}${F.length < REM_MAX_FOTOS ? `<label class="add" for="f-rem-foto">${icon('plus')}<span>Agregar otra foto</span></label>` : ''}</div>
+        <p class="muted" style="font-size:12.5px;margin:0">${F.length === 1 ? '1 foto' : `${F.length} fotos`}. ${ia ? 'Cuando estén todas, toca “Leer con Claude”: saca el despiece de todas juntas.' : 'Se guardan con la remisión y llenas el despiece a mano.'}</p>`
+      : `<label class="drop" for="f-rem-foto">${icon('up')}<b>Sube las fotos de la remisión</b><span>Una o varias: si tiene varias hojas, súbelas todas. ${ia ? 'Claude saca el despiece de todas juntas: medidas, largos y cantidades.' : 'Se guardan con la remisión y llenas el despiece a mano.'}</span></label>`;
+    return `${remStepper(W)}${fotos}
+    <input id="f-rem-foto" type="file" accept="image/*" multiple class="sr-only">
     <div class="note" id="foto-status" hidden></div>
     <div class="form-grid">${fld('f-fecha', 'Fecha del cargue', dateF('f-fecha', W.fecha))}${fld('f-remision', 'N.º de remisión', inp('f-remision', W.numero, { ph: 'Opcional' }))}</div>
-    <div>${btn('Llenarla a mano, sin foto', 'data-act="rem-manual"', 'ghost sm')}</div>`;
+    <div>${btn(F.length ? 'Llenar el despiece a mano' : 'Llenarla a mano, sin foto', 'data-act="rem-manual"', 'ghost sm')}</div>`;
+  }
   if (W.step === 2) {
     return `${remStepper(W)}
       <div class="rem-top">${remFotoPrev()}<div class="form-grid" style="flex:1">${fld('f-fecha', 'Fecha del cargue', dateF('f-fecha', W.fecha))}${fld('f-remision', 'N.º de remisión', inp('f-remision', W.numero, { ph: 'Opcional' }))}</div></div>
@@ -2706,12 +2736,18 @@ function remBody(W) {
 
 FORMS['remision'] = {
   eyebrow: 'Remisiones', title: 'Nueva remisión de cargue', done: 'Remisión guardada',
-  init: () => ({ step: 1, fecha: todayStr(), numero: '', items: [], modo: '', destinos: [{ tipo: '' }], asig: [] }),
-  cta: W => W.step === 1 ? 'Siguiente' : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? 'Revisar y confirmar' : 'Guardar remisión',
+  init: () => { remFotosLimpiar(); return { step: 1, fecha: todayStr(), numero: '', items: [], modo: '', destinos: [{ tipo: '' }], asig: [] }; },
+  cta: W => W.step === 1 ? (remFotos().length && S.sample && S.sampleImg ? `Leer ${remFotos().length === 1 ? 'la foto' : `las ${remFotos().length} fotos`} con Claude` : 'Siguiente') : W.step === 2 ? 'Confirmar despiece' : W.step === 3 ? 'Revisar y confirmar' : 'Guardar remisión',
   foot: W => `<button type="button" class="btn" data-act="rem-back"${W.step > 1 ? '' : ' hidden'}>Atrás</button>`,
   body: W => remBody(W),
   onChange: (t, f) => {
-    if (t.id === 'f-rem-foto' && t.files && t.files[0]) { remRead(f, S.form.rec); remLeerFoto(t.files[0]); return; }
+    if (t.id === 'f-rem-foto' && t.files && t.files.length) {
+      remRead(f, S.form.rec);
+      const antes = remFotos().length, pedidas = t.files.length;
+      remAgregarFotos(t.files); remPaint();
+      if (antes + pedidas > REM_MAX_FOTOS) formError(`Máximo ${REM_MAX_FOTOS} fotos por remisión.`);
+      return;
+    }
     if (t.matches('select[data-rk]')) { remRead(f, S.form.rec); remPaint(); }
   },
   live: form => {
@@ -2754,7 +2790,10 @@ FORMS['remision'] = {
     if (S.demo) { formError('Estás viendo el ejemplo. Sal del ejemplo para registrar datos reales.'); return; }
     remRead(form, W);
     formError('');
-    if (W.step === 1) { if (!W.items.length) W.items = [{}]; remIr(2); return; }
+    if (W.step === 1) {
+      if (remFotos().length && S.sample && S.sampleImg) { remLeerFotos(); return; }
+      if (!W.items.length) W.items = [{}]; remIr(2); return;
+    }
     if (W.step === 2) {
       if (!isDate(W.fecha)) { formError('Pon la fecha del cargue.'); return; }
       try { W.items = readLines(form, 'dmg').map(({ ok, ...l }) => l); } catch (e) { formError(e.message); return; }
@@ -2821,13 +2860,17 @@ async function remGuardar(W) {
     destinos.push(r);
   }
   const rec = { fecha: W.fecha, numero: W.numero || '', items: W.items, destinos, piezas: sum(destinos, x => x.piezas), rastras: sum(destinos, x => x.rastras), valor: sum(destinos, x => x.valor), mo };
-  if (S.remFoto && puedeGuardarFoto()) {
-    try { Object.assign(rec, await guardarFoto(S.remFoto, `remision-${W.numero || W.fecha}.jpg`, 'remisiones')); }
-    catch { toast('La remisión se guardó, pero la foto no se pudo subir.'); }
+  const F = remFotos();
+  if (F.length && puedeGuardarFoto()) {
+    const fotos = [];
+    for (const [i, f] of F.entries()) {
+      try { const g = await guardarFoto(f.file, `remision-${W.numero || W.fecha}${F.length > 1 ? `-${i + 1}` : ''}.jpg`, 'remisiones'); if (tieneFoto(g)) fotos.push(g); } catch { /* sigue con las demás */ }
+    }
+    if (fotos.length) rec.fotos = fotos;
+    if (fotos.length < F.length) toast(fotos.length ? `La remisión se guardó, pero ${F.length - fotos.length} de las ${F.length} fotos no se pudieron subir.` : 'La remisión se guardó, pero las fotos no se pudieron subir.');
   }
   await Store.save('remisiones', { ...rec, id: remisionId });
-  if (S.remFotoUrl) URL.revokeObjectURL(S.remFotoUrl);
-  S.remFoto = null; S.remFotoUrl = '';
+  remFotosLimpiar();
 }
 
 // Detalle de una remisión guardada: foto, despiece, destinos y nómina. Eliminarla deshace lo que creó.
@@ -2837,7 +2880,9 @@ FORMS['remision-ver'] = {
   body: r => {
     const M = model();
     const nom = M.nominaMovs.filter(m => m.col === 'remisiones' && m.id === r.id && m.tipo === 'devengo');
-    return `<div class="rem-top">${tieneFoto(r) ? fotoThumb(r, 'remisión').replace('class="thumb"', 'class="thumb big"') : ''}<div><b>${r.numero ? `Remisión ${esc(r.numero)}` : 'Remisión sin número'}</b><span class="muted" style="display:block;font-size:12.5px">${fmtDate(r.fecha)} · ${num(r.piezas, 0)} piezas · ${num(r.rastras)} rastras · ${cop(r.valor)}</span></div></div>
+    const fotos = fotosDe(r);
+    return `<div class="rem-top">${fotos.length === 1 ? fotoThumb(fotos[0], 'remisión').replace('class="thumb"', 'class="thumb big"') : ''}<div><b>${r.numero ? `Remisión ${esc(r.numero)}` : 'Remisión sin número'}</b><span class="muted" style="display:block;font-size:12.5px">${fmtDate(r.fecha)} · ${num(r.piezas, 0)} piezas · ${num(r.rastras)} rastras · ${cop(r.valor)}</span></div></div>
+      ${fotos.length > 1 ? `<div class="form-sec"><h4>Fotos (${fotos.length})</h4></div><div class="fotos">${fotos.map((x, i) => fotoThumb(x, `foto ${i + 1} de la remisión`).replace('class="thumb"', 'class="thumb big"')).join('')}</div>` : ''}
       <div class="form-sec"><h4>Para quién fue</h4></div>
       <div class="ledger">${(r.destinos || []).map(x => `<div class="lk" data-act="edit" data-col="${esc(x.col)}" data-id="${esc(x.id)}" role="button" tabindex="0"><span>${esc(x.nombre)}<small>${x.convertido ? 'Pedido que estaba por entregar' : x.tipo === 'bb' ? 'Despacho a Barro Blanco · sin precio, valor estimado' : x.tipo === 'mayorista' ? 'Mayorista' : 'Cliente final'} · ${num(x.piezas, 0)} pzs · ${num(x.rastras)} rastras</small></span><b>${cop(x.valor)}</b></div>`).join('')}</div>
       <div class="form-sec"><h4>Despiece</h4></div>
@@ -3225,6 +3270,7 @@ document.addEventListener('click', e => {
     case 'cli-menu': cliMenu(t); break;
     case 'trab': openForm('trabajador', { id: t.dataset.id }); break;
     case 'ver-foto': verFoto(t); break;
+    case 'rem-quitar-foto': { const W = S.form.rec; remRead($('#form'), W); const [f] = remFotos().splice(+t.dataset.i, 1); if (f) URL.revokeObjectURL(f.url); remPaint(); break; }
     case 'rem-manual': { const W = S.form.rec; remRead($('#form'), W); if (!W.items.length) W.items = [{}]; remIr(2); break; }
     case 'rem-back': { const W = S.form.rec; remRead($('#form'), W); formError(''); remIr(Math.max(1, W.step - 1)); break; }
     case 'rem-modo': { const W = S.form.rec; remRead($('#form'), W); W.modo = t.dataset.m; if (W.modo === 'uno') W.destinos = [W.destinos[0] || { tipo: '' }]; W.asig = []; remPaint(); break; }

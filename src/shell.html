@@ -253,6 +253,16 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .tbl.asig input, .dest .tbl input { width: 92px; height: 32px; padding: 0 8px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); font-family: var(--f-mono); text-align: right; }
 .tbl.asig input:focus, .dest .tbl input:focus, .dest select:focus, .dest input:focus { outline: 0; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .rem-top { display: flex; align-items: center; gap: 14px; }
+/* Varias fotos de una remisión */
+.fotos { display: flex; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; }
+.fotos .ft { position: relative; }
+.fotos .x { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; display: grid; place-items: center; padding: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--surface); color: var(--fg); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.18); }
+.fotos .x svg { width: 12px; height: 12px; }
+.fotos .x:hover { border-color: var(--brand); color: var(--brand); }
+.fotos .add { width: 88px; height: 88px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 2px dashed color-mix(in srgb, var(--brand) 55%, var(--line-strong)); border-radius: 9px; background: var(--accent-soft); color: var(--brand); font-size: 11px; line-height: 1.2; text-align: center; cursor: pointer; }
+.fotos .add svg { width: 18px; height: 18px; }
+.fotos .add:hover { border-color: var(--brand); box-shadow: var(--glow); }
+.fotos.mini { gap: 6px; margin: 0; max-width: 176px; flex: none; }
 .hero-empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; padding: 34px 16px 26px; }
 .hero-empty > svg { width: 46px; height: 46px; color: var(--brand); padding: 10px; border-radius: 14px; background: var(--accent-soft); box-sizing: content-box; }
 .hero-empty b { font-size: 17px; }
