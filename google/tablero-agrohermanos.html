@@ -378,6 +378,8 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 /* clients */
 .clients { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 14px; }
 .client { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; text-align: left; transition: transform .2s, border-color .2s, box-shadow .2s; }
+.client-f { display: block; margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--accent-tx); }
+.client[aria-pressed="true"] .client-f { color: var(--fg-2); }
 .client:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: var(--glow); }
 .client[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .client-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
@@ -1505,8 +1507,9 @@ function pendientes(M) {
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Anticipo', r: 1, f: p => p.calc.pagado > 0.5 ? cop(p.calc.pagado) : '<span class="muted">—</span>' },
     { h: 'Cobrar al entregar', r: 1, f: p => `<b>${cop(Math.max(0, p.calc.total - p.calc.pagado))}</b>` },
+    { h: '', f: p => p.canal === 'bb' ? btn(`${icon('check')}Entregar`, `data-act="entregar" data-id="${esc(p.id)}"`, 'sm') : '' },
   ], PE, { act: p => editAttr(p.col || 'ventas', p.id), empty: '<p class="muted">No hay pedidos por entregar.</p>',
-    foot: PE.length > 1 ? ['Total', '', cop(sum(PE, p => p.calc.total)), cop(sum(PE, p => p.calc.pagado)), cop(sum(PE, p => Math.max(0, p.calc.total - p.calc.pagado)))] : null });
+    foot: PE.length > 1 ? ['Total', '', cop(sum(PE, p => p.calc.total)), cop(sum(PE, p => p.calc.pagado)), cop(sum(PE, p => Math.max(0, p.calc.total - p.calc.pagado))), ''] : null });
 
   const fila = (label, sub, v, view) => `<div${view ? ` class="lk" data-act="nav" data-v="${view}" role="button" tabindex="0"` : ''}><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${cop(v)}</b></div>`;
   const deben = [], debes = [];
@@ -1618,6 +1621,7 @@ VIEW_FN.mayoristas = R => {
       <div class="client-h"><div><b>${esc(c.nombre)}</b><span>${esc(lista ? lista.nombre : 'Sin lista de precios')} · ${k.dias ? `${k.dias} días de crédito` : 'De contado'}${n(c.saldoInicial) ? ` · arrancó ${n(c.saldoInicial) > 0 ? 'debiendo' : 'con'} ${cop(Math.abs(n(c.saldoInicial)), true)}${n(c.saldoInicial) < 0 ? ' a favor' : ''}` : ''}</span></div>${st}</div>
       <dl><div><dt>${k.saldo < -0.5 ? 'Saldo a favor' : 'Saldo'}</dt><dd>${cop(Math.abs(k.saldo))}</dd></div><div><dt>${pe.length ? 'Por entregar' : 'Próximo vence'}</dt><dd>${pe.length ? `${fmtDay(pe[0].fecha)} · ${num(sum(pe, p => p.calc.piezas), 0)} pzs` : k.prox ? fmtDay(k.prox) : '—'}</dd></div>
       <div><dt>Rastras período</dt><dd>${num(sum(mine, e => e.rastras))}</dd></div><div><dt>Utilidad período</dt><dd>${cop(sum(mine, e => e.util), true)}</dd></div></dl>
+      <span class="client-f">${sel === c.id ? 'Viendo su estado de cuenta ↓' : 'Ver estado de cuenta →'}</span>
     </button>`;
   }).join('');
 
@@ -1661,13 +1665,46 @@ VIEW_FN.mayoristas = R => {
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Utilidad esperada', r: 1, f: p => signed(p.calc.util) },
   ], PE, { act: p => editAttr('ventas', p.id) }), { sub: 'Pedidos en producción. Ya cuentan como lo que te deben; cuentan como venta cuando los marques como entregados.' }) : '';
-  return `${head}<div class="clients">${cards}</div>${peCard}${kp}
+  const cuentaCard = sel ? `<div id="cuenta">${card(`Estado de cuenta · ${esc(M.cli.get(sel).nombre)}`, cuentaTabla(sel, M), { sub: 'Todas sus compras y abonos, del más viejo al más nuevo, con el saldo después de cada uno. Toca una fila para abrirla.', acts: btn(`${icon('plus')}Abono`, `data-act="form" data-form="abono" data-cli="${esc(sel)}"`, 'sm') + btn(`${icon('plus')}Pedido`, `data-act="form" data-form="venta-mayorista" data-cli="${esc(sel)}"`, 'sm') + btn('Cerrar', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') })}</div>` : '';
+  return `${head}<div class="clients">${cards}</div>${cuentaCard}${peCard}${kp}
     ${card(sel ? `Pedidos de ${esc(M.cli.get(sel).nombre)}` : 'Pedidos', ped, { acts: sel ? btn('Ver todos', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') : '' })}
     <div class="grid g-1-1">
       ${card('Ventas y utilidad', trendLegend() + trendChart(R, Ef, [], { h: 200 }))}
       ${card('Abonos', ab)}
     </div>`;
 };
+
+/* ---------- Estado de cuenta de un cliente: compras y abonos con el saldo después de cada uno ---------- */
+function cuentaMovs(cid, M = model()) {
+  const c = M.cli.get(cid); if (!c) return null;
+  const movs = [], fin = c.tipo === 'final';
+  const det = k => `${num(k.piezas, 0)} pzs · ${num(k.rastras)} rastras`;
+  for (const v of M.d.ventas.filter(v => v.clienteId === cid && v.canal === (fin ? 'final' : 'mayorista'))) {
+    const k = calcVenta(v);
+    movs.push({ fecha: v.fecha, orden: v.creado || '', concepto: v.remision ? `Compra · remisión ${v.remision}` : 'Compra', sub: det(k), cargo: k.total, por: fin ? (v.estado || 'Pendiente') === 'Pendiente' : v.estado === 'Por entregar', col: 'ventas', id: v.id });
+    if (fin) for (const pg of v.pagos || []) movs.push({ fecha: pg.fecha || v.fecha, orden: (v.creado || '') + '~', concepto: 'Pago', sub: 'Registrado en el pedido', abono: n(pg.valor), col: 'ventas', id: v.id });
+  }
+  if (fin) for (const a of M.d.anticipos.filter(a => a.clienteId === cid)) movs.push({ fecha: a.fecha, orden: a.creado || '', concepto: 'Anticipo', sub: [a.medio, a.nota].filter(Boolean).join(' · '), abono: n(a.valor), col: 'anticipos', id: a.id });
+  else for (const a of M.d.abonos.filter(a => a.clienteId === cid)) movs.push({ fecha: a.fecha, orden: a.creado || '', concepto: 'Abono', sub: [a.medio, destinoTxt(a, M), a.nota].filter(Boolean).join(' · '), abono: n(a.valor), col: 'abonos', id: a.id });
+  movs.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || '') || (a.orden || '').localeCompare(b.orden || ''));
+  const si = fin ? 0 : n(c.saldoInicial);
+  let saldo = si;
+  for (const m of movs) { saldo += n(m.cargo) - n(m.abono); m.saldo = saldo; }
+  const siFecha = isDate(c.saldoInicialFecha) ? c.saldoInicialFecha : String(c.creado || '').slice(0, 10);
+  return { c, si, siFecha, movs, compras: sum(movs, m => n(m.cargo)), abonos: sum(movs, m => n(m.abono)), saldo };
+}
+const saldoTxt = s => s > 0.5 ? `<span class="neg">Debe ${cop(s)}</span>` : s < -0.5 ? `<span class="pos">A favor ${cop(-s)}</span>` : '<span class="muted">$0</span>';
+function cuentaTabla(cid, M = model()) {
+  const k = cuentaMovs(cid, M); if (!k) return '';
+  const rows = [...(Math.abs(k.si) > 0.5 ? [{ inicial: true, fecha: k.siFecha, saldo: k.si }] : []), ...k.movs];
+  return table([
+    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+    { h: 'Movimiento', f: m => m.inicial ? `<span class="cell-strong">Saldo inicial</span><span class="sub">Con lo que arrancó en el tablero</span>` : `<span class="cell-strong">${esc(m.concepto)}</span>${m.por ? ' ' + chip('warn', 'Por entregar') : ''}<span class="sub">${esc(m.sub || '')}</span>` },
+    { h: 'Compra', r: 1, f: m => m.cargo ? cop(m.cargo) : '' },
+    { h: 'Abono', r: 1, f: m => m.abono ? `<span class="pos">${cop(m.abono)}</span>` : '' },
+    { h: 'Saldo', r: 1, f: m => `<b>${saldoTxt(m.saldo)}</b>` },
+  ], rows, { act: m => m.inicial ? editAttr('clientes', cid) : editAttr(m.col, m.id), empty: '<p>Todavía no tiene compras ni abonos.</p>', foot: rows.length ? ['Total', '', cop(k.compras), cop(k.abonos), `<b>${saldoTxt(k.saldo)}</b>`] : null });
+}
 
 /* ---------- Barro Blanco ---------- */
 VIEW_FN.bb = R => {
@@ -1684,7 +1721,8 @@ VIEW_FN.bb = R => {
     { h: 'Precio sociedad', r: 1, f: x => cop(x.calc.base) },
     { h: 'Tu parte', r: 1, f: x => signed(x.calc.miParte) },
     { h: 'Te liquida', r: 1, f: x => `<b>${cop(x.calc.debe)}</b>` },
-  ], PB, { act: x => editAttr('bbVentas', x.id) }), { sub: 'Ventas cerradas que todavía no se entregan. Ya cuentan como lo que te deben; cuentan como venta cuando las marques entregadas.' }) : '';
+    { h: '', f: x => btn(`${icon('check')}Entregar`, `data-act="entregar" data-id="${esc(x.id)}"`, 'sm') },
+  ], PB, { act: x => editAttr('bbVentas', x.id) }), { sub: 'Ventas cerradas que todavía no se entregan. Ya cuentan como lo que te deben. Cuando se entreguen, toca Entregar y pon cómo pagó el cliente: ahí cuentan como venta.' }) : '';
   if (!inv.length && !M.d.bbPagos.length && !M.bbEntries.length) return head + pbCard + card('', emptyState('Todavía no hay movimientos con Barro Blanco', 'Registra el primer despacho con la relación de despacho: medidas, largos y cantidades, sin precio. El precio se pone cuando se vende.', addBtn('Despacho al punto', 'bb-despacho', '')))
     + card(`Inventario en ${esc(cfg.punto)}`, `<div class="inv-res"><div><span>Piezas</span><b>0</b></div><div><span>Rastras</span><b>0</b></div><div><span>Referencias</span><b>0</b></div><div><span>Valor estimado</span><b>$0</b></div><div><span>Tu costo</span><b>$0</b></div><div><span>Por acabarse</span><b>0</b></div></div><p class="muted">Cuando registres el primer despacho, aquí ves cada pieza que hay en el punto, lo vendido y lo que queda.</p>`, { sub: 'Lo que hay hoy en el punto: despachado menos devuelto menos vendido.' });
 
@@ -1750,6 +1788,7 @@ VIEW_FN.bb = R => {
     { h: 'Utilidad punto', r: 1, f: e => signed(e.calc.utilPunto) },
     { h: 'Tu parte', r: 1, f: e => signed(e.calc.miParte) },
     { h: 'Te liquida', r: 1, f: e => cop(e.calc.debe) },
+    { h: 'Cobro al cliente', f: e => cobroChip(e.ref) },
   ], E, { act: e => editAttr('bbVentas', e.id), empty: '<p>No hay ventas reportadas en este período.</p>' });
   const D0 = M.d.bbDespachos.filter(x => inR(x.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
   const dt = table([
@@ -1814,7 +1853,7 @@ VIEW_FN.final = R => {
     act: r => r.id ? editAttr('clientes', r.id) : '',
     empty: emptyState('Sin clientes finales', 'Guarda a tus clientes para elegirlos rápido al hacer un pedido.', addBtn('Cliente final', 'cliente-final', '')),
   });
-  const dirCard = card('Directorio de clientes', dt, { sub: 'Toca un cliente para editarlo, o los tres puntos para cargarle un pedido o un anticipo.', acts: addBtn('Cliente', 'cliente-final') });
+  const dirCard = card('Directorio de clientes', dt, { sub: 'Toca un cliente para editarlo, o los tres puntos para ver su estado de cuenta o cargarle un pedido o un anticipo.', acts: addBtn('Cliente', 'cliente-final') });
 
   if (!all.length && !pend.length && !M.d.anticipos.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido: elige el cliente o escribe su nombre, celular y dirección. Si te da un anticipo, cárgalo con el botón Anticipo.', addBtn('Pedido de cliente final', 'venta-final', '') + addBtn('Anticipo', 'anticipo', ''))) + dirCard;
 
@@ -2631,6 +2670,39 @@ const despForm = tipo => ({
 FORMS['bb-despacho'] = despForm('despacho');
 FORMS['bb-devolucion'] = despForm('devolucion');
 
+// Cómo le pagó el cliente a la sociedad al recibir.
+const COBROS = [['Transferencia', 'Transferencia'], ['Efectivo', 'Efectivo'], ['Consignación', 'Consignación'], ['Nequi', 'Nequi o Daviplata'], ['Otro', 'Otro'], ['Crédito', 'A crédito (quedó debiendo)']];
+const cobroDebe = v => { if (!v.cobro || !v.cobro.medio) return 0; return Math.max(0, calcBB(v, CFG().pctSocio).venta - n(v.cobro.valor)); };
+const cobroChip = v => !v.cobro || !v.cobro.medio ? '<span class="muted">—</span>' : cobroDebe(v) > 0.5 ? `${chip('warn', v.cobro.medio === 'Crédito' ? 'A crédito' : `Pagó parte · ${v.cobro.medio}`)}<span class="sub">Debe ${cop(cobroDebe(v))}</span>` : chip('good', v.cobro.medio, 'check');
+FORMS['bb-entregar'] = {
+  col: 'bbVentas', eyebrow: 'Barro Blanco', accion: true, title: 'Marcar venta entregada', cta: 'Marcar entregada', done: 'Venta entregada',
+  init: () => ({}),
+  body: r => {
+    const c = calcBB(r, CFG().pctSocio), cb = r.cobro || {};
+    return `<div class="note"><b>${esc(r.cliente || 'Venta de la sociedad')}</b> · ${num(c.piezas, 0)} pzs · venta ${cop(c.venta)} · ${esc(CFG().socio)} te liquida ${cop(c.debe)}.${r.origen === 'directo' ? ' Sale directo desde Agrohermanos: al marcarla entregada suma a la nómina de ese día. Si sale en una remisión, mejor márcala desde la remisión (Para quién → Un pedido que estaba por entregar), así queda con la foto y el viaje.' : ''}</div>
+    <div class="form-grid">
+      ${fld('f-fecha', 'Fecha de entrega', dateF('f-fecha', todayStr()))}
+      ${fld('f-cobro', '¿Cómo pagó el cliente?', selF('f-cobro', cb.medio || 'Transferencia', COBROS))}
+      ${fld('f-pagado', 'Valor que pagó', moneyF('f-pagado', cb.medio ? cb.valor : c.venta), { hint: 'Si pagó solo una parte, escribe cuánto: lo demás queda como deuda del cliente.' })}
+      ${commonNote(r)}
+    </div><div id="live"></div>`;
+  },
+  live: form => {
+    const venta = calcBB(S.form.rec, CFG().pctSocio).venta, pag = val(form, 'f-cobro') === 'Crédito' ? 0 : parseMoney(val(form, 'f-pagado')), debe = venta - pag;
+    return totalsBox([['Venta', cop(venta)], ['Pagó', cop(pag)], ['Queda debiendo el cliente', debe > 0.5 ? `<span class="neg">${cop(debe)}</span>` : '$0', 1]]);
+  },
+  onChange: (t, f) => {
+    if (t.id !== 'f-cobro') return;
+    const v = $('#f-pagado', f);
+    if (t.value === 'Crédito') v.value = ''; else if (!parseMoney(v.value)) v.value = moneyIn(calcBB(S.form.rec, CFG().pctSocio).venta);
+    recalcForm();
+  },
+  read: (f, r) => {
+    const medio = val(f, 'f-cobro'), fecha = val(f, 'f-fecha');
+    return { ...r, estado: 'Entregada', fechaPactada: r.fechaPactada || r.fecha, fecha, cobro: { medio, valor: medio === 'Crédito' ? 0 : parseMoney(val(f, 'f-pagado')), fecha }, ...(r.origen === 'directo' ? { mo: r.mo || moSnap() } : {}), nota: val(f, 'f-nota') };
+  },
+  validate: d => !isDate(d.fecha) ? 'Pon la fecha de entrega.' : d.cobro.medio !== 'Crédito' && !(d.cobro.valor > 0) ? 'Escribe cuánto pagó, o elige “A crédito”.' : '',
+};
 FORMS['bb-venta'] = {
   foto: true, col: 'bbVentas', eyebrow: 'Barro Blanco', title: 'Venta de la sociedad', cta: 'Guardar venta', done: 'Venta guardada',
   init: () => ({ fecha: todayStr(), items: [], pct: n(CFG().pctSocio), estado: 'Entregada', origen: 'punto' }),
@@ -2640,6 +2712,8 @@ FORMS['bb-venta'] = {
       ${fld('f-estado', 'Estado', selF('f-estado', r.estado || 'Entregada', [['Entregada', 'Entregada'], ['Por entregar', 'Vendida, por entregar']]))}
       ${fld('f-origen', '¿De dónde sale la madera?', selF('f-origen', r.origen || 'punto', [['punto', `Del inventario de ${CFG().punto}`], ['directo', 'Despacho directo desde Agrohermanos']]), { hint: 'Directo no descuenta del inventario del punto y suma a la nómina cuando sale.' })}
       ${fld('f-clientebb', 'Cliente o proyecto', inp('f-clientebb', r.cliente, { ph: 'Opcional: a quién se le vendió' }), { full: true })}
+      ${fld('f-cobro', '¿Cómo pagó el cliente?', selF('f-cobro', r.cobro?.medio || '', [['', 'Sin registrar'], ...COBROS]), { hint: 'Cuando ya se entregó.' })}
+      ${fld('f-pagado', 'Valor que pagó', moneyF('f-pagado', r.cobro?.valor))}
     </div>
     <div class="note">Escribe lo que se vendió y a qué precio. El precio de venta sale de la lista de venta: cámbialo si se vendió más caro o con descuento. El precio de sociedad sale de la lista de la sociedad.</div>
     ${linesBlock('bbv', r.items, 'Piezas vendidas')}
@@ -2650,7 +2724,8 @@ FORMS['bb-venta'] = {
     const p = n(parseQty(val(form, 'f-pct')));
     return totalsBox([['Venta en el punto', cop(t.venta)], ['Precio de sociedad', cop(t.base)], ['Utilidad del punto', signed(t.up)], [`Tu parte (${num(p, 0)}%)`, signed(t.up * p / 100)], [`Parte de ${esc(CFG().socio)}`, signed(t.up * (100 - p) / 100)], [`${esc(CFG().socio)} te liquida`, cop(t.base + t.up * p / 100), 1], ['Tu costo real', cop(t.costo)], ['Tu utilidad real', signed(t.base + t.up * p / 100 - t.costo), 1]]);
   },
-  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), pct: parseQty(val(f, 'f-pct')), estado: val(f, 'f-estado'), origen: val(f, 'f-origen'), cliente: val(f, 'f-clientebb'), ...(val(f, 'f-origen') === 'directo' ? { mo: r.mo || moSnap() } : {}), items: readLines(f, 'bbv'), nota: val(f, 'f-nota') }),
+  read: (f, r) => ({ ...r, fecha: val(f, 'f-fecha'), pct: parseQty(val(f, 'f-pct')), estado: val(f, 'f-estado'), origen: val(f, 'f-origen'), cliente: val(f, 'f-clientebb'),
+    cobro: val(f, 'f-cobro') ? { ...(r.cobro || {}), medio: val(f, 'f-cobro'), valor: val(f, 'f-cobro') === 'Crédito' ? 0 : parseMoney(val(f, 'f-pagado')) } : null, ...(val(f, 'f-origen') === 'directo' ? { mo: r.mo || moSnap() } : {}), items: readLines(f, 'bbv'), nota: val(f, 'f-nota') }),
   validate: d => !isDate(d.fecha) ? 'Pon la fecha de la venta.' : !d.items.length ? 'Agrega al menos una pieza vendida.' : d.items.some(l => !l.precio) ? 'Falta el precio de venta en alguna pieza.' : d.items.some(l => !l.pbb) ? 'Falta el precio de sociedad en alguna pieza.' : '',
 };
 
@@ -3123,6 +3198,20 @@ FORMS['anticipo'] = {
 };
 
 /* ---- Menú de tres puntos de cada cliente final ---- */
+// Estado de cuenta de un cliente en el panel lateral (desde el menú de cada cliente final).
+FORMS['cuenta'] = {
+  eyebrow: 'Estado de cuenta', cta: 'Cerrar',
+  title: r => model().cli.get(r.clienteId)?.nombre || 'Cliente',
+  init: () => ({}),
+  body: r => {
+    const k = cuentaMovs(r.clienteId); if (!k) return '<p>No encontré este cliente.</p>';
+    return `<div class="inv-res"><div><span>Compras</span><b>${cop(k.compras, true)}</b></div><div><span>${k.c.tipo === 'final' ? 'Pagos y anticipos' : 'Abonos'}</span><b>${cop(k.abonos, true)}</b></div><div><span>Saldo hoy</span><b>${saldoTxt(k.saldo)}</b></div></div>
+      <p class="muted" style="font-size:12.5px;margin:0">Del más viejo al más nuevo, con el saldo después de cada movimiento. Toca una fila para abrirla.</p>
+      ${cuentaTabla(r.clienteId)}
+      <div class="pills">${btn(`${icon('plus')}${k.c.tipo === 'final' ? 'Anticipo' : 'Abono'}`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'anticipo' : 'abono'}" data-cli="${esc(r.clienteId)}"`, 'sm')}${btn(`${icon('plus')}Pedido`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'venta-final' : 'venta-mayorista'}" data-cli="${esc(r.clienteId)}"`, 'sm')}</div>`;
+  },
+  submit: async () => closeForm(),
+};
 function cliMenu(btnEl) {
   cerrarPop();
   const c = model().cli.get(btnEl.dataset.id); if (!c) return;
@@ -3132,6 +3221,7 @@ function cliMenu(btnEl) {
   m.innerHTML = `<h4>${esc(c.nombre)}</h4>
     <button type="button" role="menuitem" data-act="form" data-form="venta-final" data-cli="${esc(c.id)}"><i></i>Nuevo pedido</button>
     <button type="button" role="menuitem" data-act="form" data-form="anticipo" data-cli="${esc(c.id)}"><i style="background:var(--brand)"></i>Cargar anticipo</button>
+    <button type="button" role="menuitem" data-act="cuenta" data-id="${esc(c.id)}"><i style="background:var(--green)"></i>Estado de cuenta</button>
     <button type="button" role="menuitem" data-act="edit" data-col="clientes" data-id="${esc(c.id)}"><i></i>Editar cliente</button>`;
   document.body.appendChild(m);
   const w = m.offsetWidth;
@@ -3691,10 +3781,10 @@ function openForm(kind, rec, prefill, ai) {
   S.form = { kind, rec: r, isNew: !rec, ai };
   const T = typeof F.title === 'function' ? F.title(r) : F.title;
   const base = T.replace(/^Nuev[oa] /, '');
-  const title = rec ? (F.cta === 'Cerrar' ? T : `Editar ${base.charAt(0).toLowerCase()}${base.slice(1)}`) : T;
+  const title = rec && !F.accion ? (F.cta === 'Cerrar' ? T : `Editar ${base.charAt(0).toLowerCase()}${base.slice(1)}`) : T;
   $('#form').innerHTML = `<header><div><div class="eyebrow">${F.eyebrow}${S.demo ? ' · ejemplo' : ''}</div><h2>${esc(title)}</h2></div><button type="button" class="icon-btn" data-act="close" aria-label="Cerrar">${icon('x')}</button></header>
     <div class="panel-b"><div class="form-err" id="form-err" hidden></div>${ai ? `<div class="note"><b>Claude llenó este formulario${ai.n > 1 ? ` (${ai.i} de ${ai.n})` : ''}.</b> Revisa los datos y guarda.${ai.nota ? ' ' + esc(ai.nota) : ''}</div>` : ''}${F.foto ? fotoPedidoBlock() : ''}${F.body(r)}</div>
-    <footer>${rec && (F.col || F.remove) ? '<button type="button" class="btn danger" data-act="del">Eliminar</button>' : ''}<span class="sp"></span>${F.foot ? F.foot(r) : ''}${F.cta === 'Cerrar' ? '' : '<button type="button" class="btn ghost" data-act="close">Cancelar</button>'}<button type="submit" class="btn primary" id="f-submit">${F.cta === 'Cerrar' ? 'Cerrar' : rec ? 'Guardar cambios' : (typeof F.cta === 'function' ? F.cta(r) : F.cta || 'Guardar')}</button></footer>`;
+    <footer>${rec && (F.col || F.remove) && !F.accion ? '<button type="button" class="btn danger" data-act="del">Eliminar</button>' : ''}<span class="sp"></span>${F.foot ? F.foot(r) : ''}${F.cta === 'Cerrar' ? '' : '<button type="button" class="btn ghost" data-act="close">Cancelar</button>'}<button type="submit" class="btn primary" id="f-submit">${F.cta === 'Cerrar' ? 'Cerrar' : rec && !F.accion ? 'Guardar cambios' : (typeof F.cta === 'function' ? F.cta(r) : F.cta || 'Guardar')}</button></footer>`;
   $('#drawer').hidden = false;
   document.body.style.overflow = 'hidden';
   if (!rec) for (const row of $$('[data-line]', $('#form'))) autoPrice($('#form'), row);
@@ -3957,7 +4047,9 @@ document.addEventListener('click', e => {
     case 'nomina-pagar': { const s1 = model().nominaSaldo.get(t.dataset.id) || 0; openForm('nomina-pago', null, { trabajadorId: t.dataset.id, valor: Math.max(0, Math.round(s1)) }); break; }
     case 'del': armDelete(t); break;
     case 'demo': S.demo = !S.demo; closeForm(); bump(); break;
-    case 'cli': S.filterCli = S.filterCli === t.dataset.id ? '' : t.dataset.id; render(); break;
+    case 'cli': S.filterCli = S.filterCli === t.dataset.id ? '' : t.dataset.id; render(); if (S.filterCli) setTimeout(() => { const el = $('#cuenta'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); break;
+    case 'cuenta': cerrarPop(); openForm('cuenta', { clienteId: t.dataset.id }); break;
+    case 'entregar': { const v = D().bbVentas.find(x => x.id === t.dataset.id); if (v) openForm('bb-entregar', v); break; }
     case 'lista-ver': S.listaSel = t.dataset.id; render(); setTimeout(() => { const cs = $$('.card'); cs[cs.length - 1].scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30); break;
     case 'mx': S.matrixMode = t.dataset.m; render(); break;
     case 'cm': S.costMode = t.dataset.m; render(); break;

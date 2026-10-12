@@ -370,6 +370,8 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 /* clients */
 .clients { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 14px; }
 .client { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 12px; cursor: pointer; text-align: left; transition: transform .2s, border-color .2s, box-shadow .2s; }
+.client-f { display: block; margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--accent-tx); }
+.client[aria-pressed="true"] .client-f { color: var(--fg-2); }
 .client:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: var(--glow); }
 .client[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
 .client-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
