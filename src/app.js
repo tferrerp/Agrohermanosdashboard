@@ -70,16 +70,24 @@ const IC = {
   edit: '<path d="M10.5 3 13 5.5 6 12.5H3.5V10z"/>',
   pauta: '<path d="M2.5 6.5v3h2l4.5 3v-9l-4.5 3zM11.3 6.2a2.4 2.4 0 0 1 0 3.6M12.9 4.6a4.6 4.6 0 0 1 0 6.8"/>',
   nomina: '<circle cx="6" cy="5.5" r="2"/><path d="M2.5 12.5c.4-2 1.8-3.2 3.5-3.2s3.1 1.2 3.5 3.2M10.5 3.8a2 2 0 0 1 0 3.6M11.6 9.5c1.1.5 1.8 1.5 2 3"/>',
+  seguimiento: '<path d="M2.5 3.5h11v7.5H6.5L3.5 13.5V11h-1z"/><path d="M5.5 6.6h5M5.5 8.6h3"/>',
+  chat: '<path d="M2.5 3.5h11v7.5H6.5L3.5 13.5V11h-1z"/><path d="M5.5 6.6h5M5.5 8.6h3"/>',
   remision: '<path d="M1.8 4.2h7.6v6.6H1.8zM9.4 6.6h2.7l2.1 2.3v1.9H9.4"/><circle cx="4.6" cy="11.6" r="1.3"/><circle cx="11.6" cy="11.6" r="1.3"/>',
   dots: '<circle cx="3.5" cy="8" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="12.5" cy="8" r=".9" fill="currentColor"/>',
+  equipo: '<path d="M2 12.5h12M3.5 12.5 5 9h6l1.5 3.5"/><circle cx="8" cy="5.2" r="1.8"/><path d="M2.5 9.5 1.5 7.5M13.5 9.5l1-2"/>',
+  mercado: '<circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/>',
   spark: '<path d="M8 2v3.2M8 10.8V14M2 8h3.2M10.8 8H14M4.2 4.2l2.1 2.1M9.7 9.7l2.1 2.1M11.8 4.2 9.7 6.3M6.3 9.7l-2.1 2.1"/>',
+  bandeja: '<path d="M2.5 9.5 4.3 3.5h7.4l1.8 6v3h-11zM2.5 9.5h3l1 1.6h3l1-1.6h3"/>',
+  copiar: '<path d="M5.5 5.5h7v7h-7z"/><path d="M3.5 10.5v-7h7"/>',
+  minas: '<path d="M2.5 13.5 9.2 6.8"/><path d="M4.6 3.4c3-1.4 6.2-.6 8 2 1.4 1.8 1.6 4.4.6 6.8"/>',
+  doc: '<path d="M4 2.5h5.5L12 5v8.5H4z"/><path d="M9.5 2.5V5H12M6 8h4M6 10.5h4"/>',
 };
 const icon = (k, cls = '') => `<svg class="${cls}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k] || ''}</svg>`;
 
 /* =========================================================================
    Modelo de datos
    ========================================================================= */
-const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'remisiones', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina'];
+const COLS = ['listas', 'clientes', 'ventas', 'abonos', 'anticipos', 'remisiones', 'bbDespachos', 'bbVentas', 'bbPagos', 'pineraCompras', 'pineraPagos', 'gastos', 'nomina', 'seguimiento', 'bandeja', 'informes', 'inteligencia', 'prospectos', 'minasPedidos', 'minasPagos'];
 // Tabla de EJEMPLO (precio de la pinera por rastra según el largo). Los costos reales no van en el código:
 // se guardan en la configuración del tablero (Precios y costos → Editar costos).
 const PINERA_EJEMPLO = [
@@ -106,10 +114,15 @@ const CANAL = {
 
 const VIEWS = [
   { id: 'resumen', label: 'Home', icon: 'resumen', group: 'Negocio' },
+  { id: 'bandeja', label: 'Bandeja', icon: 'bandeja', group: 'Negocio' },
+  { id: 'seguimiento', label: 'Seguimiento', icon: 'seguimiento', group: 'Ventas' },
+  { id: 'mercado', label: 'Prospectos', icon: 'mercado', group: 'Ventas' },
   { id: 'remisiones', label: 'Remisiones', icon: 'remision', group: 'Ventas' },
   { id: 'mayoristas', label: 'Mayoristas', icon: 'mayoristas', group: 'Ventas' },
   { id: 'bb', label: 'Barro Blanco', icon: 'bb', group: 'Ventas' },
   { id: 'final', label: 'Cliente final', icon: 'final', group: 'Ventas' },
+  { id: 'minas', label: 'Minas', icon: 'minas', group: 'Ventas' },
+  { id: 'equipo', label: 'Equipo', icon: 'equipo', group: 'Equipo' },
   { id: 'compras', label: 'Compras y gastos', icon: 'pinera', group: 'Costos' },
   { id: 'pauta', label: 'Pauta', icon: 'pauta', group: 'Costos' },
   { id: 'nomina', label: 'Nómina', icon: 'nomina', group: 'Costos' },
@@ -763,16 +776,22 @@ function emptyState(title, text, actions = '') {
    Marco: navegación, filtro de fechas, avisos
    ========================================================================= */
 let raf = 0;
-function bump() { S.ver++; schedule(); }
+function bump() { S.ver++; schedule(); try { window.dispatchEvent(new Event('ah-datos')); } catch { /* nada */ } }
 function schedule() { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; render(); }); }
 
 function renderNav() {
   const M = model();
   const vencidos = [...M.cartera.values()].filter(c => c.vencido > 0.5).length;
+  let porResp = 0; try { porResp = segModel().porResponder.length; } catch { porResp = 0; }
+  const banPend = banPendientes().length;
   let g = '', html = '';
   for (const v of VIEWS) {
     if (v.group !== g) { g = v.group; html += `<div class="nav-g">${g}</div>`; }
-    const badge = v.id === 'mayoristas' && vencidos ? `<span class="badge" title="Clientes con saldo vencido">${vencidos}</span>` : '';
+    const badge = v.id === 'mayoristas' && vencidos ? `<span class="badge" title="Clientes con saldo vencido">${vencidos}</span>`
+      : v.id === 'mercado' && prPorContactar() ? `<span class="badge pr" title="Prospectos por contactar">${prPorContactar()}</span>`
+      : v.id === 'seguimiento' && porResp ? `<span class="badge" title="Te toca responder">${porResp}</span>`
+      : v.id === 'bandeja' && banPend ? `<span class="badge eq-b" title="Propuestas por aprobar">${banPend}</span>`
+      : v.id === 'equipo' && window.AHOficina && window.AHOficina.trabajando ? `<span class="badge eq" title="Agentes trabajando ahora">${window.AHOficina.trabajando}</span>` : '';
     html += `<button type="button" data-act="nav" data-v="${v.id}" ${S.view === v.id ? 'aria-current="page"' : ''}>${icon(v.icon)}<span>${v.label}</span>${badge}</button>`;
   }
   $('#nav').innerHTML = html;
@@ -799,6 +818,7 @@ function renderBanner() {
 const MENU = [
   ['Ventas', [['remision', 'Remisión de cargue (foto)'], ['venta-mayorista', 'Pedido de mayorista'], ['abono', 'Abono de mayorista'], ['venta-final', 'Pedido de cliente final'], ['anticipo', 'Anticipo de cliente final']]],
   ['Barro Blanco', [['bb-despacho', 'Despacho al punto'], ['bb-venta', 'Venta de la sociedad'], ['bb-pago', 'Pago de Rubén'], ['bb-devolucion', 'Devolución del punto']]],
+  ['Minas', [['mina-pedido', 'Pedido de minas'], ['mina-pago', 'Pago a Madelistas'], ['mina-cobro', 'Pago del revendedor']]],
   ['Compras y gastos', [['pinera-compra', 'Compra de madera a la pinera'], ['pinera-pago', 'Pago a la pinera'], ['gasto', 'Gasto'], ['campana', 'Campaña de pauta'], ['pauta-real', 'Cobro real de pauta del mes']]],
   ['Nómina', [['nomina-pago', 'Abono a trabajador'], ['nomina-cargo', 'Trabajo extra']]],
   ['Configuración', [['cliente', 'Cliente mayorista'], ['cliente-final', 'Cliente final'], ['lista', 'Lista de precios']]],
@@ -808,11 +828,14 @@ function renderMenu() {
 }
 
 function render() {
+  // No repinta mientras escribes un mensaje de la Bandeja (se perdería lo que escribes); repinta al salir del cuadro.
+  const ae = document.activeElement;
+  if (ae && ae.dataset && ae.dataset.banTxt && S.view === 'bandeja') { S.renderLater = true; return; }
   CH = {}; chSeq = 0;
   renderNav(); renderFilters(); renderBanner(); renderMenu();
   $('#ai-btn').hidden = !S.sample;
   const v = VIEWS.find(x => x.id === S.view) || VIEWS[0];
-  $('#filters').hidden = v.id === 'precios' || v.id === 'datos';
+  $('#filters').hidden = v.id === 'precios' || v.id === 'datos' || v.id === 'seguimiento' || v.id === 'bandeja' || v.id === 'mercado' || v.id === 'minas';
   $('#view-title').textContent = v.label;
   $('#view-eyebrow').textContent = S.demo ? 'Agrohermanos · ejemplo' : 'Agrohermanos';
   const R = rangeBounds();
@@ -830,6 +853,8 @@ function render() {
    Vistas
    ========================================================================= */
 const VIEW_FN = {};
+// Equipo se abre a pantalla completa (oficina 3D); esto solo aparece si algo la deja como vista activa.
+VIEW_FN.equipo = () => card('', emptyState('La oficina del equipo se abre a pantalla completa.', 'Toca el botón para entrar al puente.', '<button type="button" class="btn primary" data-act="nav" data-v="equipo">Abrir la oficina</button>'));
 
 function prevRange(R) {
   const days = diffDays(R.from, R.to) + 1;
@@ -867,6 +892,19 @@ const trendLegend = (a = 'Ventas', b = 'Utilidad') => `<div class="legend"><span
 
 function alertas(M) {
   const out = [];
+  try {
+    const G = segModel();
+    if (G.porResponder.length) {
+      const k = G.porResponder.length, viejo = Math.max(...G.porResponder.map(x => x.espera).filter(Number.isFinite), 0);
+      out.push([viejo >= 1 ? 'crit' : 'warn', `${k} ${k === 1 ? 'persona espera' : 'personas esperan'} tu respuesta en WhatsApp`,
+        G.porResponder.slice(0, 3).map(x => x.nombre).join(' · ') + (k > 3 ? ` y ${k - 3} más` : ''), 'seguimiento']);
+    }
+    if (G.seguir.length) {
+      const k = G.seguir.length;
+      out.push(['warn', `${k} ${k === 1 ? 'seguimiento pendiente' : 'seguimientos pendientes'}`,
+        'Les diste precio o cotización y no han respondido: ' + G.seguir.slice(0, 3).map(x => x.nombre).join(' · ') + (k > 3 ? ` y ${k - 3} más` : ''), 'seguimiento']);
+    }
+  } catch { /* sin datos de seguimiento */ }
   for (const p of M.porEntregar) {
     const dd = diffDays(M.hoy, p.fecha);
     out.push([dd < 0 ? 'crit' : dd <= 7 ? 'warn' : 'info', `Entrega a ${p.cliente}: ${num(p.calc.piezas, 0)} pzs por ${cop(p.calc.total)}`,
@@ -886,6 +924,8 @@ function alertas(M) {
   const debeN = M.trab.filter(t => (M.nominaSaldo.get(t.id) || 0) > 0.5);
   if (debeN.length) { const sab = sabadoDe(M.hoy), dd = diffDays(M.hoy, sab); out.push([dd <= 1 ? 'warn' : 'info', `Nómina: le debes ${cop(sum(debeN, t => M.nominaSaldo.get(t.id)))}`, `${debeN.map(t => `${t.nombre} ${cop(M.nominaSaldo.get(t.id))}`).join(' · ')}. Se paga el sábado ${fmtDay(sab)}${dd === 0 ? ' (hoy)' : ''}.`, 'nomina']); }
   if (M.finalSaldo > 0.5) out.push(['warn', `Clientes finales te deben ${cop(M.finalSaldo)}`, 'Pedidos con pago pendiente.', 'final']);
+  const bp = banPendientes();
+  if (bp.length) out.unshift(['info', `${bp.length} ${bp.length === 1 ? 'propuesta espera' : 'propuestas esperan'} tu aprobación en la Bandeja`, bp.slice(0, 3).map(b => b.titulo || b.contacto).join(' · ') + (bp.length > 3 ? ` y ${bp.length - 3} más` : ''), 'bandeja']);
   return out;
 }
 function alertList(list) {
@@ -928,6 +968,13 @@ function pendientes(M) {
   for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.saldo > 0.5) { const r = finDeben.get(p.cliente) || { v: 0, desp: 0, pend: 0, ant: 0 }; r.v += p.calc.saldo; r.pend++; r.ant += p.calc.pagado; finDeben.set(p.cliente, r); }
   for (const [nm, r] of finDeben) deben.push([nm, ['Cliente final', r.desp ? `${r.desp} ${r.desp === 1 ? 'pedido despachado' : 'pedidos despachados'}` : '', r.pend ? `${r.pend === 1 ? 'pedido' : r.pend + ' pedidos'} por entregar` : '', r.ant > 0.5 ? `ya dio ${cop(r.ant, true)} de anticipo` : ''].filter(Boolean).join(' · '), r.v, 'final']);
   if (M.pineraSaldo > 0.5) debes.push(['La pinera', 'Compra de madera', M.pineraSaldo, 'compras']);
+  // Minas: lo que deben los revendedores y lo que le debes a Madelistas.
+  try {
+    const mk = minaPedidos().map(p => ({ p, k: calcMina(p) }));
+    const cob = mk.filter(x => x.k.porCobrar > 0.5), prov = mk.filter(x => x.k.debeProv > 0.5);
+    if (cob.length) deben.push(['Revendedores de minas', `${cob.length} ${cob.length === 1 ? 'pedido' : 'pedidos'}${cob.some(x => x.p.estado !== 'Entregado') ? ' · incluye lo que está por entregar' : ''}`, sum(cob, x => x.k.porCobrar), 'minas']);
+    if (prov.length) debes.push(['Madelistas (minas)', `Madera para ${prov.length === 1 ? 'un pedido' : prov.length + ' pedidos'} de minas`, sum(prov, x => x.k.debeProv), 'minas']);
+  } catch { /* sin minas */ }
   for (const t of M.trab) { const v = M.nominaSaldo.get(t.id) || 0; if (v > 0.5) debes.push([t.nombre, `Nómina · se paga el sábado ${fmtDay(sabadoDe(M.hoy))}`, v, 'nomina']); }
   // Un anticipo de un pedido no es plata que debas (debes la madera). Solo cuenta el que no tiene pedido.
   for (const [cid, v] of M.anticipoLibre) debes.push([M.cli.get(cid)?.nombre || 'Cliente final', 'Anticipo sin pedido · se descuenta del próximo', v, 'final']);
@@ -1025,7 +1072,7 @@ VIEW_FN.mayoristas = R => {
       <div class="client-h"><div><b>${esc(c.nombre)}</b><span>${esc(lista ? lista.nombre : 'Sin lista de precios')} · ${k.dias ? `${k.dias} días de crédito` : 'De contado'}${n(c.saldoInicial) ? ` · arrancó ${n(c.saldoInicial) > 0 ? 'debiendo' : 'con'} ${cop(Math.abs(n(c.saldoInicial)), true)}${n(c.saldoInicial) < 0 ? ' a favor' : ''}` : ''}</span></div>${st}</div>
       <dl><div><dt>${k.saldo < -0.5 ? 'Saldo a favor' : 'Saldo'}</dt><dd>${cop(Math.abs(k.saldo))}</dd></div><div><dt>${pe.length ? 'Por entregar' : 'Próximo vence'}</dt><dd>${pe.length ? `${fmtDay(pe[0].fecha)} · ${num(sum(pe, p => p.calc.piezas), 0)} pzs` : k.prox ? fmtDay(k.prox) : '—'}</dd></div>
       <div><dt>Rastras período</dt><dd>${num(sum(mine, e => e.rastras))}</dd></div><div><dt>Utilidad período</dt><dd>${cop(sum(mine, e => e.util), true)}</dd></div></dl>
-      <span class="client-f">${sel === c.id ? 'Viendo su estado de cuenta ↓' : 'Ver estado de cuenta →'}</span>
+      <span class="client-f">${sel === c.id ? 'Viendo su historial ↓' : 'Ver historial de pagos →'}</span>
     </button>`;
   }).join('');
 
@@ -1069,7 +1116,7 @@ VIEW_FN.mayoristas = R => {
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Utilidad esperada', r: 1, f: p => signed(p.calc.util) },
   ], PE, { act: p => editAttr('ventas', p.id) }), { sub: 'Pedidos en producción. Ya cuentan como lo que te deben; cuentan como venta cuando los marques como entregados.' }) : '';
-  const cuentaCard = sel ? `<div id="cuenta">${card(`Estado de cuenta · ${esc(M.cli.get(sel).nombre)}`, cuentaTabla(sel, M), { sub: 'Todas sus compras y abonos, del más viejo al más nuevo, con el saldo después de cada uno. Toca una fila para abrirla.', acts: btn(`${icon('plus')}Abono`, `data-act="form" data-form="abono" data-cli="${esc(sel)}"`, 'sm') + btn(`${icon('plus')}Pedido`, `data-act="form" data-form="venta-mayorista" data-cli="${esc(sel)}"`, 'sm') + btn('Cerrar', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') })}</div>` : '';
+  const cuentaCard = sel ? `<div id="cuenta">${card(`Historial · ${esc(M.cli.get(sel).nombre)}`, cuentaResumen(cuentaMovs(sel, M)) + cuentaTabla(sel, M), { sub: 'Cada venta con la mercancía que se le mandó, cada abono y cómo quedó el saldo después, del más viejo al más nuevo. Toca una fila para abrirla.', acts: btn(`${icon('plus')}Abono`, `data-act="form" data-form="abono" data-cli="${esc(sel)}"`, 'sm') + btn(`${icon('plus')}Pedido`, `data-act="form" data-form="venta-mayorista" data-cli="${esc(sel)}"`, 'sm') + btn('Cerrar', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') })}</div>` : '';
   return `${head}<div class="clients">${cards}</div>${cuentaCard}${peCard}${kp}
     ${card(sel ? `Pedidos de ${esc(M.cli.get(sel).nombre)}` : 'Pedidos', ped, { acts: sel ? btn('Ver todos', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') : '' })}
     <div class="grid g-1-1">
@@ -1085,7 +1132,7 @@ function cuentaMovs(cid, M = model()) {
   const det = k => `${num(k.piezas, 0)} pzs · ${num(k.rastras)} rastras`;
   for (const v of M.d.ventas.filter(v => v.clienteId === cid && v.canal === (fin ? 'final' : 'mayorista'))) {
     const k = calcVenta(v);
-    movs.push({ fecha: v.fecha, orden: v.creado || '', concepto: v.remision ? `Compra · remisión ${v.remision}` : 'Compra', sub: det(k), cargo: k.total, por: fin ? (v.estado || 'Pendiente') === 'Pendiente' : v.estado === 'Por entregar', col: 'ventas', id: v.id });
+    movs.push({ fecha: v.fecha, orden: v.creado || '', concepto: v.remision ? `Compra · remisión ${v.remision}` : 'Compra', sub: det(k), lines: k.lines, flete: k.flete, cargo: k.total, por:fin ? (v.estado || 'Pendiente') === 'Pendiente' : v.estado === 'Por entregar', col: 'ventas', id: v.id });
     if (fin) for (const pg of v.pagos || []) movs.push({ fecha: pg.fecha || v.fecha, orden: (v.creado || '') + '~', concepto: 'Pago', sub: 'Registrado en el pedido', abono: n(pg.valor), col: 'ventas', id: v.id });
   }
   if (fin) for (const a of M.d.anticipos.filter(a => a.clienteId === cid)) movs.push({ fecha: a.fecha, orden: a.creado || '', concepto: 'Anticipo', sub: [a.medio, a.nota].filter(Boolean).join(' · '), abono: n(a.valor), col: 'anticipos', id: a.id });
@@ -1095,19 +1142,31 @@ function cuentaMovs(cid, M = model()) {
   let saldo = si;
   for (const m of movs) { saldo += n(m.cargo) - n(m.abono); m.saldo = saldo; }
   const siFecha = isDate(c.saldoInicialFecha) ? c.saldoInicialFecha : String(c.creado || '').slice(0, 10);
-  return { c, si, siFecha, movs, compras: sum(movs, m => n(m.cargo)), abonos: sum(movs, m => n(m.abono)), saldo };
+  const ultAbono = movs.filter(m => m.abono > 0).pop() || null;
+  return { c, si, siFecha, movs, ultAbono, compras: sum(movs, m => n(m.cargo)), abonos: sum(movs, m => n(m.abono)), saldo };
 }
+const saldoCelda = s => `<b class="num ${s > 0.5 ? 'neg' : s < -0.5 ? 'pos' : 'muted'}">${cop(Math.abs(s))}</b><span class="sub">${s > 0.5 ? 'debe' : s < -0.5 ? 'a favor' : 'al día'}</span>`;
 const saldoTxt = s => s > 0.5 ? `<span class="neg">Debe ${cop(s)}</span>` : s < -0.5 ? `<span class="pos">A favor ${cop(-s)}</span>` : '<span class="muted">$0</span>';
+// Lo que se le mandó en cada compra: pieza por pieza, con su valor.
+const mercanciaTxt = m => (m.lines || []).map(l => `<span class="cta-ln"><span>${l.unidad === 'rastra' ? `${num(l.cant)} rastras` : `${n(l.cant)}× ${esc(l.medida)}×${num(l.largo)}`}${l.precio ? ` <i>· ${cop(l.precio)} c/u</i>` : ''}</span><span class="num">${cop(l.ingreso)}</span></span>`).join('') + (m.flete > 0 ? `<span class="cta-ln"><span>Flete</span><span class="num">${cop(m.flete)}</span></span>` : '');
+// Resumen arriba del historial: lo que se le mandó, lo que ha abonado y cómo va.
+function cuentaResumen(k) {
+  const s = k.saldo;
+  return `<div class="inv-res cta-res">
+      <div><span>Mercancía enviada</span><b>${cop(k.compras + Math.max(0, k.si))}</b><small>${k.movs.filter(m => m.cargo).length} ${k.movs.filter(m => m.cargo).length === 1 ? 'compra' : 'compras'}${k.si > 0.5 ? ' + saldo inicial' : ''}</small></div>
+      <div><span>${k.c.tipo === 'final' ? 'Pagado' : 'Abonado'}</span><b class="pos">${cop(k.abonos + Math.max(0, -k.si))}</b><small>${k.ultAbono ? `último ${fmtDate(k.ultAbono.fecha)}` : 'sin abonos todavía'}</small></div>
+      <div><span>${s > 0.5 ? 'Debe hoy' : s < -0.5 ? 'A favor hoy' : 'Saldo hoy'}</span><b class="${s > 0.5 ? 'neg' : s < -0.5 ? 'pos' : ''}">${cop(Math.abs(s))}</b><small>${s > 0.5 ? 'te debe' : s < -0.5 ? 'le queda a favor' : 'al día'}</small></div></div>`;
+}
 function cuentaTabla(cid, M = model()) {
   const k = cuentaMovs(cid, M); if (!k) return '';
   const rows = [...(Math.abs(k.si) > 0.5 ? [{ inicial: true, fecha: k.siFecha, saldo: k.si }] : []), ...k.movs];
   return table([
-    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
-    { h: 'Movimiento', f: m => m.inicial ? `<span class="cell-strong">Saldo inicial</span><span class="sub">Con lo que arrancó en el tablero</span>` : `<span class="cell-strong">${esc(m.concepto)}</span>${m.por ? ' ' + chip('warn', 'Por entregar') : ''}<span class="sub">${esc(m.sub || '')}</span>` },
-    { h: 'Compra', r: 1, f: m => m.cargo ? cop(m.cargo) : '' },
+    { h: 'Fecha', f: m => `<span class="num" style="white-space:nowrap">${fmtDay(m.fecha)}</span><span class="sub">${String(m.fecha || '').slice(0, 4)}</span>` },
+    { h: 'Movimiento', cls: 'cta-mov', f: m => m.inicial ? `<span class="cell-strong">Saldo inicial</span><span class="sub">Con lo que arrancó en el tablero</span>` : `<span class="cell-strong">${esc(m.concepto)}</span>${m.por ? ' ' + chip('warn', 'Por entregar') : ''}<span class="sub">${esc(m.sub || '')}</span>${m.lines ? `<span class="cta-items">${mercanciaTxt(m)}</span>` : ''}` },
+    { h: 'Venta', r: 1, f: m => m.cargo ? cop(m.cargo) : '' },
     { h: 'Abono', r: 1, f: m => m.abono ? `<span class="pos">${cop(m.abono)}</span>` : '' },
-    { h: 'Saldo', r: 1, f: m => `<b>${saldoTxt(m.saldo)}</b>` },
-  ], rows, { act: m => m.inicial ? editAttr('clientes', cid) : editAttr(m.col, m.id), empty: '<p>Todavía no tiene compras ni abonos.</p>', foot: rows.length ? ['Total', '', cop(k.compras), cop(k.abonos), `<b>${saldoTxt(k.saldo)}</b>`] : null });
+    { h: 'Saldo', r: 1, f: m => saldoCelda(m.saldo) },
+  ], rows, { act: m => m.inicial ? editAttr('clientes', cid) : editAttr(m.col, m.id), empty: '<p>Todavía no tiene compras ni abonos.</p>', foot: rows.length ? ['Total', '', cop(k.compras), cop(k.abonos), saldoCelda(k.saldo)] : null });
 }
 
 /* ---------- Barro Blanco ---------- */
@@ -1254,10 +1313,10 @@ VIEW_FN.final = R => {
     { h: 'Debe', r: 1, f: r => r.saldo > 0.5 ? `<span class="neg">${cop(r.saldo)}</span>` : '<span class="muted">$0</span>' },
     { h: '', f: r => r.id ? `<button type="button" class="icon-btn" data-act="cli-menu" data-id="${esc(r.id)}" aria-label="Opciones de ${esc(r.nombre)}" aria-haspopup="true">${icon('dots')}</button>` : '' },
   ], [...dir.values()].sort((a, b) => b.total - a.total || a.nombre.localeCompare(b.nombre)), {
-    act: r => r.id ? editAttr('clientes', r.id) : '',
+    act: r => r.id ? `data-act="cuenta" data-id="${esc(r.id)}" title="Ver el historial de ${esc(r.nombre)}"` : '',
     empty: emptyState('Sin clientes finales', 'Guarda a tus clientes para elegirlos rápido al hacer un pedido.', addBtn('Cliente final', 'cliente-final', '')),
   });
-  const dirCard = card('Directorio de clientes', dt, { sub: 'Toca un cliente para editarlo, o los tres puntos para ver su estado de cuenta o cargarle un pedido o un anticipo.', acts: addBtn('Cliente', 'cliente-final') });
+  const dirCard = card('Directorio de clientes', dt, { sub: 'Toca un cliente para ver su historial: lo que se le vendió, lo que ha pagado y lo que debe. Con los tres puntos lo editas o le cargas un pedido o un anticipo.', acts: addBtn('Cliente', 'cliente-final') });
 
   if (!all.length && !pend.length && !M.d.anticipos.length) return head + card('', emptyState('Todavía no hay pedidos de clientes finales', 'Registra el primer pedido: elige el cliente o escribe su nombre, celular y dirección. Si te da un anticipo, cárgalo con el botón Anticipo.', addBtn('Pedido de cliente final', 'venta-final', '') + addBtn('Anticipo', 'anticipo', ''))) + dirCard;
 
@@ -1309,6 +1368,99 @@ VIEW_FN.final = R => {
     ${card('Anticipos', ta, { sub: 'Plata que te dan antes de entregar. Se descuenta del pedido al que la cargues.', acts: addBtn('Anticipo', 'anticipo') })}
     ${dirCard}
     ${card('Ventas y utilidad', trendLegend() + trendChart(R, E, [], { h: 200 }))}`;
+};
+
+/* ---------- Minas: se le compra a Madelistas con descuento y se le revende a los revendedores de las minas ---------- */
+const MINA_ESTADOS = ['En Madelistas', 'Listo para entregar', 'Entregado'];
+const minaCfg = () => ({ descuento: 5, proveedor: 'Madelistas (Wilson Orozco)', listaFecha: '', lista: {}, venta: {}, ...(CFG().minas || {}) });
+const minaLista = () => ({ precios: minaCfg().lista || {} });
+const minaVenta = () => ({ precios: minaCfg().venta || {} });
+// Precio de Madelistas a cliente final y lo que te cuesta a ti con el descuento.
+const minaPLista = (med, L) => listaPrecio(minaLista(), med, L);
+const minaCostoU = (plista, desc = minaCfg().descuento) => Math.round(n(plista) * (1 - n(desc) / 100));
+function calcMina(p) {
+  const items = (p.items || []).map(l => ({ ...l, cant: n(l.cant), venta: n(l.cant) * n(l.precio), costoT: n(l.cant) * n(l.costo) }));
+  const madera = sum(items, l => l.venta), costoMadera = sum(items, l => l.costoT);
+  const venta = madera + n(p.flete), costo = costoMadera + n(p.costoFlete);
+  const pagos = (D().minasPagos || []).filter(x => x.pedidoId === p.id);
+  const pagadoProv = sum(pagos.filter(x => x.tipo !== 'cliente'), x => x.valor);
+  const cobrado = sum(pagos.filter(x => x.tipo === 'cliente'), x => x.valor);
+  return {
+    items, piezas: sum(items, l => l.cant), rastras: sum(items, l => l.cant * n(l.rastras)), madera, costoMadera, venta, costo, util: venta - costo,
+    pagadoProv, debeProv: costoMadera - pagadoProv, cobrado, porCobrar: venta - cobrado,
+    sinPrecio: items.some(l => !n(l.precio)), sinCosto: items.some(l => !n(l.costo)),
+  };
+}
+const minaPedidos = () => (D().minasPedidos || []).slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+const minaNombre = p => p.revendedor || 'Revendedor sin nombre';
+
+VIEW_FN.minas = () => {
+  const mc = minaCfg(), hoy = todayStr();
+  const head = `<div class="section-h"><p>Madera que le compras a ${esc(mc.proveedor)} con ${num(mc.descuento, 1)} % de descuento sobre su lista de cliente final y le revendes a los revendedores que le venden a las minas.</p><div class="acts">${addBtn('Pedido', 'mina-pedido', 'primary sm')}${addBtn('Pago a Madelistas', 'mina-pago')}${addBtn('Pago del revendedor', 'mina-cobro')}</div></div>`;
+  const rows = minaPedidos().map(p => ({ p, k: calcMina(p) }));
+  const activos = rows.filter(r => r.p.estado !== 'Entregado');
+  const tot = (arr, f) => sum(arr, f);
+  const sinPrecio = rows.filter(r => r.k.sinPrecio).length, sinCosto = rows.filter(r => r.k.sinCosto).length;
+  const venta = tot(rows, r => r.k.venta), costo = tot(rows, r => r.k.costo), util = venta - costo;
+  const kp = `<div class="kpis">
+    ${kpi('Pedidos en curso', num(activos.length, 0), `${num(tot(activos, r => r.k.piezas), 0)} piezas · ${num(tot(activos, r => r.k.rastras))} rastras`, { dot: 'var(--s2)' })}
+    ${kpi('Venta a revendedores', cop(venta), `Costo Madelistas ${cop(costo)}${sinPrecio ? ` · ${sinPrecio} sin precio de venta` : ''}`)}
+    ${kpi('Utilidad', signed(util), `Margen ${pct(venta ? util / venta : NaN)}${sinCosto ? ' · falta costo de alguna pieza' : ''}`)}
+    ${kpi('Le debes a Madelistas', cop(Math.max(0, tot(rows, r => r.k.debeProv))), `Por cobrar a revendedores ${cop(Math.max(0, tot(rows, r => r.k.porCobrar)))}`)}
+  </div>`;
+
+  const tone = { 'En Madelistas': 'warn', 'Listo para entregar': 'wood', Entregado: 'good' };
+  const tp = table([
+    { h: 'Pedido', f: r => `<span class="num">${fmtDate(r.p.fecha)}</span><span class="sub">${esc(minaNombre(r.p))}</span>` },
+    { h: 'Detalle', f: r => detalle(r.k.items) },
+    { h: 'Entrega', f: r => { if (r.p.estado === 'Entregado') return `<span class="num">${fmtDate(r.p.entregado || r.p.entrega)}</span>`; if (!isDate(r.p.entrega)) return '<span class="muted">Sin fecha</span>'; const dd = diffDays(hoy, r.p.entrega); return `<span class="num">${fmtDate(r.p.entrega)}</span><span class="sub">${dd < 0 ? `atrasado ${-dd} d` : dd === 0 ? 'hoy' : `en ${dd} d`} · aprox.</span>`; } },
+    { h: 'Venta', r: 1, f: r => r.k.sinPrecio ? `${cop(r.k.venta)}<span class="sub">falta precio</span>` : cop(r.k.venta) },
+    { h: 'Costo', r: 1, f: r => `${cop(r.k.costo)}<span class="sub">Madelistas −${num(r.p.descuento ?? mc.descuento, 1)} %</span>` },
+    { h: 'Utilidad', r: 1, f: r => `${signed(r.k.util)}<span class="sub">${pct(r.k.venta ? r.k.util / r.k.venta : NaN)}</span>` },
+    { h: 'Madelistas', r: 1, f: r => r.k.debeProv > 0.5 ? `<span class="neg">debes ${cop(r.k.debeProv)}</span><span class="sub">pagado ${cop(r.k.pagadoProv)}</span>` : chip('good', 'Pagado', 'check') },
+    { h: 'Revendedor', r: 1, f: r => r.k.porCobrar > 0.5 ? `<span class="${r.p.estado === 'Entregado' ? 'neg' : ''}">debe ${cop(r.k.porCobrar)}</span><span class="sub">pagó ${cop(r.k.cobrado)}</span>` : chip('good', 'Pagó', 'check') },
+    { h: 'Estado', f: r => chip(tone[r.p.estado] ?? '', r.p.estado || MINA_ESTADOS[0]) },
+  ], rows, {
+    act: r => editAttr('minasPedidos', r.p.id),
+    empty: emptyState('Todavía no hay pedidos de minas', 'Registra el primero: revendedor, piezas, fecha de entrega aproximada y precio de venta. El costo sale solo de la lista de Madelistas con el descuento.', addBtn('Pedido de minas', 'mina-pedido', '')),
+    foot: rows.length > 1 ? ['Total', '', '', cop(venta), cop(costo), signed(util), cop(Math.max(0, tot(rows, r => r.k.debeProv))), cop(Math.max(0, tot(rows, r => r.k.porCobrar))), ''] : null,
+  });
+
+  const P = (D().minasPagos || []).slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const ped = id => rows.find(r => r.p.id === id);
+  const tpg = table([
+    { h: 'Fecha', f: x => `<span class="num">${fmtDate(x.fecha)}</span>` },
+    { h: 'Tipo', f: x => x.tipo === 'cliente' ? chip('good', 'Cobro a revendedor') : chip('wood', 'Pago a Madelistas') },
+    { h: 'Pedido', f: x => { const r = ped(x.pedidoId); return r ? `${esc(minaNombre(r.p))}<span class="sub">${fmtDate(r.p.fecha)} · ${num(r.k.piezas, 0)} pzs</span>` : '<span class="muted">—</span>'; } },
+    { h: 'Medio', f: x => `${esc(x.medio || '—')}${x.nota ? `<span class="sub">${esc(x.nota)}</span>` : ''}` },
+    { h: 'Valor', r: 1, f: x => cop(x.valor) },
+  ], P, { act: x => editAttr('minasPagos', x.id), empty: '<p>Todavía no hay pagos.</p>' });
+
+  // Precios de venta a los revendedores contra el costo en Madelistas.
+  const V = minaVenta().precios, vRows = [];
+  for (const [k, row] of Object.entries(V)) for (const [cm, pv] of Object.entries(row || {})) {
+    if (!n(pv)) continue;
+    const med = k.replace(/_/g, ','), L = +cm / 100, pl = minaPLista(k.replace(/_/g, '.'), L), cu = pl ? minaCostoU(pl) : 0;
+    vRows.push({ med, L, pv: n(pv), pl, cu });
+  }
+  vRows.sort((a, b) => a.med.localeCompare(b.med, 'es', { numeric: true }) || a.L - b.L);
+  const tv = table([
+    { h: 'Pieza', f: x => `<span class="cell-strong">${esc(x.med)}</span> × ${num(x.L, 2)} m` },
+    { h: 'Les vendes a', r: 1, f: x => `<b>${cop(x.pv)}</b>` },
+    { h: 'Madelistas', r: 1, f: x => x.pl ? cop(x.pl) : '<span class="muted">no está en su lista</span>' },
+    { h: `Te cuesta (−${num(mc.descuento, 1)} %)`, r: 1, f: x => x.cu ? cop(x.cu) : '<span class="muted">pedir precio a Wilson</span>' },
+    { h: 'Ganas c/u', r: 1, f: x => x.cu ? `${signed(x.pv - x.cu)}<span class="sub">${pct((x.pv - x.cu) / x.pv)}</span>` : '<span class="muted">—</span>' },
+  ], vRows, { empty: '<p>Sin precios de venta todavía.</p>' });
+
+  // Lista completa de Madelistas con el descuento aplicado.
+  const ML = minaLista().precios, largos = [...new Set(Object.values(ML).flatMap(r => Object.keys(r || {})))].map(Number).sort((a, b) => a - b);
+  const mlt = Object.keys(ML).length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Sección</th>${largos.map(c => `<th class="r">${num(c / 100, 2)} m</th>`).join('')}</tr></thead><tbody>${Object.entries(ML).map(([k, r]) => `<tr><td class="cell-strong">${esc(k.replace(/_/g, ','))}</td>${largos.map(c => n(r[c]) ? `<td class="r num" title="Madelistas ${cop(r[c])}">${cop(minaCostoU(r[c]))}</td>` : '<td></td>').join('')}</tr>`).join('')}</tbody></table></div>` : '<p class="muted">Falta cargar la lista de Madelistas.</p>';
+
+  return `${head}${kp}
+    ${card('Pedidos', tp, { sub: 'Toca un pedido para editarlo o marcarlo entregado. La fecha de entrega es aproximada.', acts: addBtn('Pedido', 'mina-pedido') })}
+    ${card('Precios para los revendedores', tv, { sub: 'Lo que les cobras contra lo que te cuesta en Madelistas con el descuento.', acts: btn(`${icon('edit')}Editar precios`, 'data-act="form" data-form="mina-precios"', 'sm') })}
+    ${card('Pagos', tpg, { sub: 'Lo que le pagas a Madelistas y lo que te pagan los revendedores.', acts: addBtn('Pago a Madelistas', 'mina-pago') + addBtn('Pago del revendedor', 'mina-cobro') })}
+    <details class="card seg-det"><summary><span><b>Lista de Madelistas con el ${num(mc.descuento, 1)} %</b><small>Tu costo por pieza (lista de cliente final de ${esc(mc.proveedor)}${mc.listaFecha ? ', ' + esc(mc.listaFecha) : ''}, menos ${num(mc.descuento, 1)} %). Pasa el dedo sobre un precio para ver el de Madelistas.</small></span>${icon('down')}</summary>${mlt}</details>`;
 };
 
 /* ---------- Compras y gastos (La Pinera + gastos) ---------- */
@@ -1711,10 +1863,406 @@ function datalistMedidas(M) {
   return `<datalist id="dl-medidas">${[...set].sort(medSort).map(m => `<option value="${esc(m)}"></option>`).join('')}</datalist>`;
 }
 
+/* ---------- Seguimiento de WhatsApp ----------
+   Claude lee los chats (por Kapso) y deja un registro por contacto en la colección "seguimiento".
+   Lo que tú cambias aquí va en el campo "manual" y Claude no lo toca. */
+const ETAPAS = [
+  ['nuevo', 'Nuevo'], ['precios', 'Precio enviado'], ['cotizacion', 'Cotización enviada'],
+  ['negociando', 'Negociando'], ['ganado', 'Ganado'], ['perdido', 'Perdido'],
+];
+const ETAPA_LBL = Object.fromEntries(ETAPAS);
+const ETAPA_TONO = { nuevo: '', precios: 'wood', cotizacion: 'wood', negociando: 'warn', ganado: 'good', perdido: 'crit' };
+const ETAPA_COLOR = { nuevo: 'var(--s3)', precios: 'var(--s2)', cotizacion: 'var(--s2)', negociando: 'var(--warn)', ganado: 'var(--s1)', perdido: 'var(--crit)' };
+const TIPO_LBL = { cliente: 'Cliente', mayorista: 'Mayorista', proveedor: 'Proveedor', equipo: 'Equipo', personal: 'Personal', otro: 'No es venta' };
+const ABIERTAS = new Set(['nuevo', 'precios', 'cotizacion', 'negociando']);
+const PRIO = { alta: 0, media: 1, baja: 2 };
+const SEG_FILTROS = [['abiertos', 'Abiertos'], ['ganado', 'Ganados'], ['perdido', 'Perdidos'], ['otros', 'No son ventas'], ['archivados', 'Archivados'], ['todos', 'Todos']];
+// Pasos de seguimiento después de tu último mensaje (días sin respuesta del cliente).
+const SEG_PASOS = [[2, '1.er seguimiento'], [5, '2.º seguimiento'], [10, 'Último intento'], [21, 'Para cerrar']];
+
+const msD = iso => { const t = Date.parse(iso || ''); return Number.isFinite(t) ? t : 0; };
+const diasDesde = iso => { const t = msD(iso); return t ? (Date.now() - t) / 864e5 : Infinity; };
+function hace(iso) {
+  const t = msD(iso); if (!t) return '—';
+  const m = Math.max(0, (Date.now() - t) / 6e4);
+  if (m < 60) return `hace ${Math.max(1, Math.round(m))} min`;
+  const h = m / 60; if (h < 24) return `hace ${Math.round(h)} h`;
+  const d = Math.floor(h / 24); return d === 1 ? 'hace 1 día' : `hace ${d} días`;
+}
+function horaCorta(iso) {
+  const t = msD(iso); if (!t) return '—';
+  try { return new Date(t).toLocaleString('es-CO', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }); }
+  catch { return new Date(t).toISOString().slice(0, 16).replace('T', ' '); }
+}
+const telTxt = t => { const s = String(t || '').replace(/\D/g, ''); return s.startsWith('57') && s.length === 12 ? `${s.slice(2, 5)} ${s.slice(5, 8)} ${s.slice(8)}` : (s ? '+' + s : ''); };
+const pasoDe = dias => { let p = null; for (const [d, l] of SEG_PASOS) if (dias >= d) p = l; return p; };
+
+function segModel() {
+  const raw = Array.isArray(D().seguimiento) ? D().seguimiento : [];
+  const estado = raw.find(x => x.id === '_estado') || null;
+  const hoy = todayStr();
+  const items = raw.filter(x => x.id !== '_estado' && x.telefono).map(r => {
+    const man = r.manual || {};
+    // Lo que cambiaste a mano vale hasta que llegue un mensaje nuevo; los tipos y el archivo valen siempre.
+    const manVigente = man.cuando && msD(man.cuando) >= msD(r.ultimaActividad);
+    const etapa = (manVigente && man.etapa) || r.etapa || '';
+    const tipo = man.tipo || r.tipo || 'cliente';
+    let turno = r.turno || 'nadie';
+    if (turno === 'yo' && man.respondido && msD(man.respondido) >= msD(r.ultimoEntrante)) turno = 'cliente';
+    const retomar = (man.posponerHasta && man.posponerHasta > hoy && man.posponerHasta) || (r.retomarEl && r.retomarEl > hoy && r.retomarEl) || '';
+    const venta = tipo === 'cliente' || tipo === 'mayorista';
+    const archivado = !!man.archivado;
+    const desdeMio = msD(man.respondido) > msD(r.ultimoSaliente) ? man.respondido : r.ultimoSaliente;
+    return { ...r, etapa, tipo, turno, retomar, venta, archivado, manual: man,
+      espera: diasDesde(r.ultimoEntrante), silencio: diasDesde(desdeMio || r.ultimaActividad) };
+  });
+  const vivos = items.filter(x => x.venta && !x.archivado);
+  const prioSort = (a, b) => (PRIO[a.prioridad] ?? 1) - (PRIO[b.prioridad] ?? 1);
+  const porResponder = vivos.filter(x => x.turno === 'yo' && x.etapa !== 'perdido' && !x.retomar)
+    .sort((a, b) => prioSort(a, b) || msD(a.ultimoEntrante) - msD(b.ultimoEntrante));
+  const esperando = vivos.filter(x => x.turno !== 'yo' && ABIERTAS.has(x.etapa) && !x.retomar);
+  const seguir = esperando.filter(x => x.silencio >= 2 && x.silencio < 21)
+    .sort((a, b) => prioSort(a, b) || b.silencio - a.silencio);
+  const cerrar = esperando.filter(x => x.silencio >= 21).sort((a, b) => prioSort(a, b) || a.silencio - b.silencio);
+  const recientes = esperando.filter(x => x.silencio < 2);
+  const pausados = vivos.filter(x => x.retomar && ABIERTAS.has(x.etapa));
+  return { estado, items, vivos, porResponder, seguir, cerrar, recientes, pausados };
+}
+
+const segWa = (tel, cls = 'btn sm') => `<a class="${cls} wa" href="https://wa.me/${esc(String(tel).replace(/\D/g, ''))}" target="_blank" rel="noopener" title="Abrir el chat en WhatsApp">${icon('chat')}WhatsApp</a>`;
+const segMenuBtn = x => `<button type="button" class="icon-btn" data-act="seg-menu" data-id="${esc(x.id)}" aria-label="Opciones de ${esc(x.nombre || telTxt(x.telefono))}">${icon('dots')}</button>`;
+
+function segFila(x, modo) {
+  const chips = [];
+  if (x.etapa) chips.push(chip(ETAPA_TONO[x.etapa] || '', ETAPA_LBL[x.etapa] || x.etapa));
+  if (x.perfil) chips.push(chip('', x.perfil));
+  if (x.origen === 'anuncio') chips.push(chip('', 'Anuncio'));
+  if (x.tipo === 'mayorista') chips.push(chip('good', 'Mayorista'));
+  let estado = '';
+  if (modo === 'responder') estado = `<span class="seg-wait ${x.espera >= 1 ? 'crit' : x.espera >= 0.17 ? 'warn' : ''}">${icon('clock')}Te escribió ${hace(x.ultimoEntrante)}</span>`;
+  else if (modo === 'seguir' || modo === 'cerrar') estado = `<span class="seg-wait ${modo === 'cerrar' ? 'crit' : 'warn'}">${icon('clock')}${esc(pasoDe(x.silencio) || 'Seguimiento')} · sin respuesta ${hace(x.ultimoSaliente || x.ultimaActividad)}</span>`;
+  else if (modo === 'pausa') estado = `<span class="seg-wait">${icon('clock')}Retomar el ${esc(fmtDay(x.retomar))}</span>`;
+  const um = x.ultimoMensaje && x.ultimoMensaje.texto
+    ? `<p class="seg-msg"><span class="seg-who ${x.ultimoMensaje.de === 'yo' ? 'me' : ''}">${x.ultimoMensaje.de === 'yo' ? 'Tú' : 'Cliente'}</span>“${esc(x.ultimoMensaje.texto)}”</p>` : '';
+  const precio = x.precio ? `<p class="seg-precio">${icon('catalogo')}${esc(x.precio)}</p>` : '';
+  const sig = x.siguientePaso && x.siguientePaso !== '—' ? `<p class="seg-next">${esc(x.siguientePaso)}</p>` : '';
+  return `<li class="seg-item${modo === 'responder' && x.prioridad === 'alta' ? ' hot' : ''}">
+    <div class="seg-main">
+      <div class="seg-head"><b>${esc(x.nombre || telTxt(x.telefono))}</b><span class="seg-tel num">${esc(telTxt(x.telefono))}</span></div>
+      <div class="pills">${estado}${chips.join('')}</div>
+      ${x.resumen ? `<p class="seg-res">${esc(x.resumen)}</p>` : ''}
+      ${precio}${um}${sig}
+    </div>
+    <div class="seg-acts">${segWa(x.telefono)}${segMenuBtn(x)}</div>
+  </li>`;
+}
+function segLista(arr, modo, vacio, max = 0) {
+  if (!arr.length) return `<div class="empty"><p>${vacio}</p></div>`;
+  const abierto = !max || (S.segMas && S.segMas[modo]);
+  const vis = abierto ? arr : arr.slice(0, max);
+  const mas = max && arr.length > max
+    ? `<button type="button" class="btn ghost sm seg-mas" data-act="seg-mas" data-k="${modo}">${abierto ? 'Ver menos' : `Ver ${arr.length - max === 1 ? 'el otro' : `los otros ${arr.length - max}`}`}</button>` : '';
+  return `<ul class="seg-list">${vis.map(x => segFila(x, modo)).join('')}</ul>${mas}`;
+}
+
+VIEW_FN.seguimiento = () => {
+  const G = segModel();
+  if (!G.items.length) {
+    return card('', emptyState('Todavía no hay chats en seguimiento.',
+      S.demo ? 'El ejemplo no trae chats de WhatsApp. Sal del ejemplo para ver los tuyos.'
+        : 'Claude revisa tus chats de WhatsApp Business cada mañana y deja aquí a quién te toca responder, a quién hacerle seguimiento y en qué va cada cotización. Si acabas de conectarlo, pídele en el chat que haga la primera revisión.'));
+  }
+  const E = G.estado;
+  const viejo = G.porResponder.reduce((a, b) => (!a || msD(b.ultimoEntrante) < msD(a.ultimoEntrante) ? b : a), null);
+  const abiertas = G.vivos.filter(x => ['precios', 'cotizacion', 'negociando'].includes(x.etapa));
+  const ganados = G.vivos.filter(x => x.etapa === 'ganado').length;
+  const perdidos = G.vivos.filter(x => x.etapa === 'perdido').length;
+  const fresco = E && E.sincronizado
+    ? `<div class="seg-sync">${icon('check')}<span>Claude revisó tus chats <b>${hace(E.sincronizado)}</b>${E.proxima ? ` · próxima revisión ${esc(horaCorta(E.proxima))}` : ''}</span></div>` : '';
+
+  const top = `${fresco}<div class="kpis">
+    ${kpi('Te toca responder', `<span class="${G.porResponder.length ? 'neg' : ''}">${num(G.porResponder.length, 0)}</span>`, viejo ? `El que más lleva esperando: ${esc(viejo.nombre)}, ${hace(viejo.ultimoEntrante)}` : 'No hay nadie esperando.')}
+    ${kpi('Hazle seguimiento', num(G.seguir.length, 0), G.cerrar.length ? `Y ${G.cerrar.length} para cerrar (más de 3 semanas sin respuesta)` : 'Les diste precio o cotización y no han respondido.')}
+    ${kpi('Precios y cotizaciones abiertas', num(abiertas.length, 0), `${abiertas.filter(x => x.etapa === 'negociando').length} negociando`)}
+    ${kpi('Cerrados', `${num(ganados, 0)} <small class="seg-kpi-small">ganados</small>`, `${num(perdidos, 0)} perdidos`)}
+  </div>`;
+
+  const embudo = ETAPAS.map(([k, l]) => ({ label: l, value: G.vivos.filter(x => x.etapa === k).length, color: ETAPA_COLOR[k] }));
+  const anuncios = G.vivos.filter(x => x.origen === 'anuncio');
+  const anunciosAbiertos = anuncios.filter(x => ABIERTAS.has(x.etapa)).length;
+  const embudoCard = card('Cómo van los contactos', `${hbars(embudo, { fmt: v => num(v, 0) })}
+    <p class="seg-foot">${num(anuncios.length, 0)} llegaron por anuncios: ${num(anunciosAbiertos, 0)} siguen abiertos y ${num(anuncios.filter(x => x.etapa === 'perdido').length, 0)} se perdieron.</p>`,
+    { sub: 'Clientes y mayoristas que tienen chat, por etapa.' });
+
+  const pausaCard = G.pausados.length ? card('En pausa', segLista(G.pausados, 'pausa', '', 3), { sub: 'Vuelven a la lista el día que dice.', cls: 'seg-side' }) : '';
+
+  const f = S.segFiltro || 'abiertos';
+  const filt = G.items.filter(x => {
+    if (f === 'archivados') return x.archivado;
+    if (x.archivado) return f === 'todos';
+    if (f === 'abiertos') return x.venta && ABIERTAS.has(x.etapa);
+    if (f === 'ganado' || f === 'perdido') return x.venta && x.etapa === f;
+    if (f === 'otros') return !x.venta;
+    return true;
+  }).sort((a, b) => msD(b.ultimaActividad) - msD(a.ultimaActividad));
+  const seg = `<div class="seg seg-f" role="group" aria-label="Filtrar contactos">${SEG_FILTROS.map(([k, l]) => `<button type="button" data-act="seg-f" data-f="${k}" aria-pressed="${f === k}">${l}</button>`).join('')}</div>`;
+  const tabla = table([
+    { h: 'Contacto', f: x => `<span class="cell-strong">${esc(x.nombre || telTxt(x.telefono))}</span><span class="sub num">${esc(telTxt(x.telefono))}${x.tipo !== 'cliente' ? ` · ${esc(TIPO_LBL[x.tipo] || x.tipo)}` : ''}</span>` },
+    { h: 'Etapa', f: x => x.etapa ? chip(ETAPA_TONO[x.etapa] || '', ETAPA_LBL[x.etapa] || x.etapa) + (x.motivoPerdido && x.etapa === 'perdido' ? `<span class="sub">${esc(x.motivoPerdido)}</span>` : '') : '<span class="muted">—</span>' },
+    { h: 'Último mensaje', f: x => x.ultimoMensaje ? `<span class="seg-cell">${x.ultimoMensaje.de === 'yo' ? '<b>Tú:</b> ' : ''}${esc(x.ultimoMensaje.texto.slice(0, 90))}${x.ultimoMensaje.texto.length > 90 ? '…' : ''}</span><span class="sub">${hace(x.ultimaActividad)}</span>` : `<span class="sub">${hace(x.ultimaActividad)}</span>` },
+    { h: 'Siguiente paso', f: x => x.siguientePaso && x.siguientePaso !== '—' ? `<span class="seg-cell">${esc(x.siguientePaso)}</span>` : '<span class="muted">—</span>' },
+    { h: '', f: x => `<div class="seg-acts">${segWa(x.telefono, 'btn ghost sm')}${segMenuBtn(x)}</div>` },
+  ], filt, { empty: '<p class="muted">No hay contactos en este filtro.</p>', limit: 300 });
+
+  const como = `<div class="note seg-note">Claude lee tus chats de WhatsApp Business por Kapso, clasifica cada conversación y te avisa al celular lo que queda pendiente. Lo que cambies aquí con ${icon('dots')} (etapa, pausa, “ya le respondí”, archivar) Claude lo respeta; si el cliente vuelve a escribir, la etapa se actualiza sola. Sigue respondiendo desde el celular como siempre.</div>`;
+
+  return `${top}
+    <div class="grid g-2-1">
+      ${card('Te toca responder', segLista(G.porResponder, 'responder', 'Nadie está esperando tu respuesta.', 6), { sub: 'Te escribieron y la conversación quedó de tu lado. Primero los más importantes.' })}
+      <div class="stack">${embudoCard}${pausaCard}</div>
+    </div>
+    ${card('Hazle seguimiento', segLista(G.seguir, 'seguir', 'No hay seguimientos pendientes.', 6), { sub: 'Les diste precio, cotización o información y no han vuelto a escribir. Escríbeles a los 2, 5 y 10 días.' })}
+    ${G.cerrar.length ? `<details class="card seg-det"><summary><span><b>Para cerrar</b><small>${num(G.cerrar.length, 0)} sin respuesta hace más de 3 semanas. Haz un último intento o márcalos como perdidos.</small></span>${icon('down')}</summary>${segLista(G.cerrar, 'cerrar', '', 10)}</details>` : ''}
+    ${card('Todos los contactos', `<div class="seg-bar">${seg}</div>${tabla}`, { sub: 'Del más reciente al más viejo.' })}
+    ${como}`;
+};
+
+function segMenu(btnEl) {
+  cerrarPop();
+  const x = segModel().items.find(i => i.id === btnEl.dataset.id); if (!x) return;
+  const r = btnEl.getBoundingClientRect();
+  const m = document.createElement('div');
+  m.className = 'menu pop seg-pop'; m.id = 'pop'; m.setAttribute('role', 'menu');
+  const opt = (label, k, v, dot = '') => `<button type="button" role="menuitem" data-act="seg-set" data-id="${esc(x.id)}" data-k="${k}" data-v="${esc(v)}"><i${dot ? ` style="background:${dot}"` : ''}></i>${label}</button>`;
+  const en = d => addDays(todayStr(), d);
+  m.innerHTML = `<h4>${esc(x.nombre || telTxt(x.telefono))}</h4>
+    <p class="seg-pop-tel num">${esc(telTxt(x.telefono))}</p>
+    ${x.turno === 'yo' ? opt('Ya le respondí', 'respondido', 'ahora', 'var(--good)') : ''}
+    <h4>Etapa</h4>
+    ${ETAPAS.filter(([k]) => k !== x.etapa).map(([k, l]) => opt(l, 'etapa', k, ETAPA_COLOR[k])).join('')}
+    <h4>Pausar</h4>
+    ${opt('3 días', 'pausa', en(3))}${opt('1 semana', 'pausa', en(7))}${opt('2 semanas', 'pausa', en(14))}${x.manual.posponerHasta ? opt('Quitar la pausa', 'pausa', '') : ''}
+    <h4>Más</h4>
+    ${x.venta ? opt('No es venta', 'tipo', 'otro') : opt('Es cliente', 'tipo', 'cliente')}
+    ${x.archivado ? opt('Sacar del archivo', 'archivar', '0') : opt('Archivar', 'archivar', '1')}
+    ${Object.keys(x.manual || {}).length ? opt('Volver a lo que dice Claude', 'reset', '1') : ''}`;
+  document.body.appendChild(m);
+  const w = m.offsetWidth;
+  m.style.top = `${Math.max(8, Math.min(window.innerHeight - m.offsetHeight - 8, r.bottom + 6))}px`;
+  m.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
+  const first = m.querySelector('button'); if (first) first.focus();
+}
+
+async function segSet(t) {
+  cerrarPop();
+  if (S.demo) { toast('Estás viendo el ejemplo. Sal del ejemplo para cambiar datos.'); return; }
+  const rec = (S.data.seguimiento || []).find(x => x.id === t.dataset.id); if (!rec) return;
+  const k = t.dataset.k, v = t.dataset.v;
+  const now = new Date().toISOString();
+  let manual = { ...(rec.manual || {}) };
+  let msg = 'Listo';
+  if (k === 'respondido') { manual.respondido = now; msg = 'Marcado como respondido'; }
+  else if (k === 'etapa') { manual.etapa = v; manual.cuando = now; msg = `Etapa: ${ETAPA_LBL[v] || v}`; }
+  else if (k === 'pausa') { if (v) { manual.posponerHasta = v; msg = `En pausa hasta el ${fmtDay(v)}`; } else { delete manual.posponerHasta; msg = 'Pausa quitada'; } }
+  else if (k === 'tipo') { manual.tipo = v; msg = v === 'otro' ? 'Movido a “No son ventas”' : 'Marcado como cliente'; }
+  else if (k === 'archivar') { if (v === '1') { manual.archivado = true; msg = 'Archivado'; } else { delete manual.archivado; msg = 'Sacado del archivo'; } }
+  else if (k === 'reset') { manual = {}; msg = 'Vuelve a lo que dice Claude'; }
+  try { await Store.save('seguimiento', { ...clone(rec), manual }); toast(msg); }
+  catch (e) { toast(errMsg(e)); }
+}
+
+/* ---------- Bandeja ----------
+   Los agentes (Fidelización, Cobros, Jefe de gabinete) dejan propuestas en la colección "bandeja".
+   Nada sale solo: Tomás revisa el mensaje, lo corrige si quiere, lo manda desde su WhatsApp y lo marca enviado. */
+const BAN_TIPO = {
+  fidelizacion: ['Después de la entrega', 'good'], reactivar: ['Reactivar', 'wood'], recompra: ['Recompra', 'wood'],
+  referido: ['Referido · 3%', 'good'], cobro: ['Cobro', 'crit'], entrega: ['Entrega y margen', ''], aviso: ['Aviso', 'warn'],
+};
+const BAN_AGENTE = { fidelizacion: 'Fidelización', cobros: 'Cobros y rentabilidad', jefe: 'Jefe de gabinete', seguimiento: 'Seguimiento' };
+function banItems() { return (Array.isArray(D().bandeja) ? D().bandeja : []).filter(b => b && b.id); }
+function banPendientes() { return banItems().filter(b => (b.estado || 'pendiente') === 'pendiente').sort((a, b) => (PRIO[a.prioridad] ?? 1) - (PRIO[b.prioridad] ?? 1) || String(b.creado || '').localeCompare(String(a.creado || ''))); }
+const banTel = b => String(b.telefono || '').replace(/\D/g, '');
+const banTexto = b => (S.banEdit && S.banEdit[b.id] != null ? S.banEdit[b.id] : (b.mensaje || ''));
+const banWaHref = b => `https://wa.me/${banTel(b)}?text=${encodeURIComponent(banTexto(b))}`;
+function banFila(b) {
+  const est = b.estado || 'pendiente', pend = est === 'pendiente';
+  const [tl, tono] = BAN_TIPO[b.tipo] || [b.tipo || 'Propuesta', ''];
+  const chips = [chip(tono, tl), b.prioridad === 'alta' ? chip('crit', 'Prioridad alta') : '', b.monto ? chip('', cop(b.monto)) : '',
+    !pend ? chip(est === 'enviado' ? 'good' : '', est === 'enviado' ? `Enviado ${b.resuelto ? fmtDay(String(b.resuelto).slice(0, 10)) : ''}` : est === 'visto' ? 'Visto' : 'Descartado') : ''].filter(Boolean).join('');
+  const tieneMsg = !!(b.mensaje && b.mensaje.trim());
+  const tel = banTel(b);
+  const msg = tieneMsg ? (pend
+    ? `<textarea class="ban-txt" data-ban-txt="${esc(b.id)}" aria-label="Mensaje para ${esc(b.contacto || '')}">${esc(banTexto(b))}</textarea>`
+    : `<p class="seg-msg"><span class="seg-who me">Mensaje</span>“${esc(b.mensajeFinal || b.mensaje)}”</p>`) : '';
+  const acts = pend ? `<div class="ban-acts">
+      ${tieneMsg && tel.length >= 10 ? `<a class="btn sm primary wa" style="color:var(--accent-ink)" data-ban-wa="${esc(b.id)}" href="${esc(banWaHref(b))}" target="_blank" rel="noopener" title="Abre el chat con el mensaje escrito; tú lo envías">${icon('chat')}Abrir en WhatsApp</a>` : ''}
+      ${tieneMsg ? btn(`${icon('copiar')}Copiar`, `data-act="ban-copy" data-id="${esc(b.id)}"`, 'sm') : ''}
+      <span class="sp"></span>
+      ${tieneMsg ? btn(`${icon('check')}Ya lo envié`, `data-act="ban-set" data-id="${esc(b.id)}" data-v="enviado"`, 'sm') : btn(`${icon('check')}Entendido`, `data-act="ban-set" data-id="${esc(b.id)}" data-v="visto"`, 'sm')}
+      ${btn('Descartar', `data-act="ban-set" data-id="${esc(b.id)}" data-v="descartado"`, 'ghost sm')}
+    </div>` : `<div class="ban-acts"><span class="sp"></span>${btn('Volver a pendiente', `data-act="ban-set" data-id="${esc(b.id)}" data-v="pendiente"`, 'ghost sm')}</div>`;
+  return `<li class="ban-item t-${esc(b.tipo || '')}${pend ? '' : ' hecho'}">
+    <div class="ban-head"><div><b>${esc(b.titulo || b.contacto || 'Propuesta')}</b><span class="sub">${esc(BAN_AGENTE[b.agente] || b.agente || 'Agente')}${b.contacto && b.titulo ? ' · ' + esc(b.contacto) : ''}${tel ? ' · ' + esc(telTxt(tel)) : ''}${b.creado ? ' · ' + esc(hace(b.creado)) : ''}</span></div><div class="pills">${chips}</div></div>
+    ${b.detalle ? `<p class="ban-det">${esc(b.detalle)}</p>` : ''}
+    ${msg}${tieneMsg && pend && tel.length < 10 ? '<p class="seg-foot" style="margin:0">No hay celular guardado: copia el mensaje y búscalo en WhatsApp.</p>' : ''}
+    ${acts}
+  </li>`;
+}
+function mdLite(txt) {
+  const out = []; let ul = null;
+  for (const raw of String(txt || '').split('\n')) {
+    const l = raw.trim();
+    const inl = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    if (/^[-*•] /.test(l)) { if (!ul) { ul = []; } ul.push(`<li>${inl(l.slice(2))}</li>`); continue; }
+    if (ul) { out.push(`<ul>${ul.join('')}</ul>`); ul = null; }
+    if (!l) continue;
+    if (/^#{1,4} /.test(l)) out.push(`<h4>${inl(l.replace(/^#+ /, ''))}</h4>`); else out.push(`<p>${inl(l)}</p>`);
+  }
+  if (ul) out.push(`<ul>${ul.join('')}</ul>`);
+  return out.join('');
+}
+VIEW_FN.bandeja = () => {
+  const all = banItems(), pend = banPendientes();
+  const tab = S.banTab || 'pendientes';
+  const inf = (Array.isArray(D().informes) ? D().informes : []).slice().sort((a, b) => String(b.fecha || b.creado || '').localeCompare(String(a.fecha || a.creado || '')));
+  const intel = (Array.isArray(D().inteligencia) ? D().inteligencia : []).slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  const hechos = all.filter(b => (b.estado || 'pendiente') !== 'pendiente').sort((a, b) => String(b.resuelto || b.creado || '').localeCompare(String(a.resuelto || a.creado || '')));
+  const porAg = k => pend.filter(b => b.agente === k).length;
+  const cob = pend.filter(b => b.tipo === 'cobro');
+  const top = `<div class="section-h"><p>Lo que los agentes te proponen cada mañana. Nada sale solo: revisa el mensaje, corrígelo si quieres, ábrelo en WhatsApp y envíalo tú. Después márcalo como enviado para que no te lo vuelvan a proponer.</p></div>
+    <div class="kpis">
+      ${kpi('Por aprobar', `<span class="${pend.length ? 'neg' : ''}">${num(pend.length, 0)}</span>`, pend.length ? 'Revisa y envía desde tu WhatsApp' : 'No hay nada pendiente.')}
+      ${kpi('Fidelización', num(porAg('fidelizacion'), 0), 'Después de la entrega, recompra y reactivar')}
+      ${kpi('Cobros', num(cob.length, 0), cob.length ? `${cop(sum(cob, b => b.monto))} por cobrar en estos mensajes` : 'Sin cobros pendientes de enviar')}
+      ${kpi('Informes', num(inf.length, 0), inf.length ? `Último: ${esc(inf[0].titulo || '')}` : 'Los semanales y mensuales llegan aquí')}
+    </div>`;
+  const tabs = `<div class="seg ban-tabs" role="group" aria-label="Ver">${[['pendientes', `Por aprobar (${pend.length})`], ['informes', `Informes (${inf.length})`], ['inteligencia', `Inteligencia (${intel.length})`], ['hechos', 'Historial']].map(([k, l]) => `<button type="button" data-act="ban-tab" data-t="${k}" aria-pressed="${tab === k}">${l}</button>`).join('')}</div>`;
+  let body;
+  if (tab === 'informes') {
+    body = card('Informes', table([
+      { h: 'Fecha', f: x => `<span class="num">${isDate(x.fecha) ? fmtDate(x.fecha) : '—'}</span>` },
+      { h: 'Informe', f: x => `<span class="cell-strong">${esc(x.titulo || 'Informe')}</span><span class="sub">${esc(x.resumen || '')}</span>` },
+      { h: 'Agente', f: x => esc(BAN_AGENTE[x.agente] || x.agente || '') },
+    ], inf, { act: x => `data-act="informe" data-id="${esc(x.id)}"`, empty: '<p class="muted">Todavía no hay informes. Cobros deja la cartera los lunes y la rentabilidad el primer lunes del mes; el Jefe de gabinete, “por qué perdemos ventas” cada mes.</p>' }), { sub: 'Toca uno para leerlo completo.' });
+  } else if (tab === 'inteligencia') {
+    body = card('Inteligencia', table([
+      { h: 'Fecha', f: x => `<span class="num">${isDate(x.fecha) ? fmtDate(x.fecha) : '—'}</span>` },
+      { h: 'Qué', f: x => `<span class="cell-strong">${esc(x.titulo || '')}</span><span class="sub">${esc(x.detalle || '')}</span>` },
+      { h: 'Tipo', f: x => chip(x.tipo === 'competencia' ? 'crit' : x.tipo === 'precio' ? 'wood' : '', x.tipo || 'otro') },
+      { h: 'Producto · precio', f: x => `${esc(x.producto || '—')}${x.precio ? `<span class="sub">${esc(x.precio)}</span>` : ''}` },
+      { h: 'Fuente', f: x => esc(x.fuente || '') },
+    ], intel, { empty: '<p class="muted">Todavía no hay inteligencia guardada.</p>', limit: 200 }), { sub: 'Lo que la revisión de la mañana saca de Yo2 y de los chats: competencia, precios, proveedores y demanda.' });
+  } else if (tab === 'hechos') {
+    body = card('Historial', hechos.length ? `<ul class="ban-list">${hechos.slice(0, 60).map(banFila).join('')}</ul>` : '<div class="empty"><p>Todavía no has aprobado ni descartado nada.</p></div>', { sub: 'Lo enviado, visto o descartado. Los agentes lo usan para no insistir más de una vez al mes.' });
+  } else {
+    body = pend.length ? `<ul class="ban-list">${pend.map(banFila).join('')}</ul>`
+      : card('', `<div class="hero-empty">${icon('bandeja')}<b>Bandeja al día</b><p>Cada mañana, a las 7:58, Fidelización y Cobros dejan aquí los mensajes listos para que los apruebes.</p></div>`);
+  }
+  return top + tabs + body;
+};
+async function banSet(t) {
+  if (S.demo) { toast('Estás viendo el ejemplo. Sal del ejemplo para cambiar datos.'); return; }
+  const b = banItems().find(x => x.id === t.dataset.id); if (!b) return;
+  const v = t.dataset.v, rec = clone(b);
+  rec.estado = v;
+  if (v === 'pendiente') { delete rec.resuelto; delete rec.mensajeFinal; }
+  else {
+    rec.resuelto = new Date().toISOString();
+    if (v === 'enviado' && b.mensaje) rec.mensajeFinal = banTexto(b);
+  }
+  try { await Store.save('bandeja', rec); if (S.banEdit) delete S.banEdit[b.id]; toast(v === 'enviado' ? 'Marcado como enviado' : v === 'descartado' ? 'Descartado' : v === 'visto' ? 'Listo' : 'Volvió a pendiente'); }
+  catch (e) { toast(errMsg(e)); }
+}
+function banCopy(t) {
+  const b = banItems().find(x => x.id === t.dataset.id); if (!b) return;
+  const txt = banTexto(b);
+  const ok = () => toast('Mensaje copiado');
+  try { navigator.clipboard.writeText(txt).then(ok, () => { const el = $(`[data-ban-txt="${CSS.escape(b.id)}"]`); if (el) { el.select(); toast('Selecciónalo y cópialo'); } }); }
+  catch { toast('No se pudo copiar'); }
+}
+
+/* ---------- Prospectos (agente Mercado) ---------- */
+const PR_ESTADOS = [['nuevo', 'Por contactar'], ['contactado', 'Contactado'], ['respondio', 'Respondió'], ['cliente', 'Cliente'], ['descartado', 'Descartado']];
+const PR_LBL = Object.fromEntries(PR_ESTADOS);
+const PR_TONO = { nuevo: 'wood', contactado: '', respondio: 'warn', cliente: 'good', descartado: 'crit' };
+const PR_ZONAS = ['Oriente', 'Suroeste', 'Envigado', 'Las Palmas'];
+const PR_TIPOS = [['Techador', 'Techadores'], ['Arquitecto', 'Arquitectos'], ['Constructora', 'Constructoras'], ['Aliado', 'Tiendas de tejas (aliados)']];
+const PR_PRIO = { alta: 0, media: 1, baja: 2 };
+const prItems = () => S.demo ? [] : (S.data.prospectos || []).filter(x => x.id !== '_estado');
+const prEstado = () => S.demo ? null : (S.data.prospectos || []).find(x => x.id === '_estado') || null;
+const prPorContactar = () => { try { return prItems().filter(x => (x.estado || 'nuevo') === 'nuevo').length; } catch { return 0; } };
+function prLinks(x) {
+  const c = x.canal || {}; const out = [];
+  if (c.whatsapp) out.push(`<a class="btn sm wa" href="https://wa.me/${esc(String(c.whatsapp).replace(/\D/g, ''))}?text=${encodeURIComponent(x.mensaje || '')}" target="_blank" rel="noopener" title="Abre WhatsApp con el mensaje escrito; tú lo revisas y lo envías">${icon('chat')}WhatsApp con mensaje</a>`);
+  if (c.tel) out.push(`<a class="btn sm" href="tel:${esc(c.tel)}">Llamar ${esc(c.tel.replace('+57', ''))}</a>`);
+  if (c.instagram) out.push(`<a class="btn ghost sm" href="${esc(c.instagram)}" target="_blank" rel="noopener">Instagram</a>`);
+  if (c.web) out.push(`<a class="btn ghost sm" href="${esc(c.web)}" target="_blank" rel="noopener">Web</a>`);
+  if (c.maps) out.push(`<a class="btn ghost sm" href="${esc(c.maps)}" target="_blank" rel="noopener">Maps</a>`);
+  if (c.email) out.push(`<a class="btn ghost sm" href="mailto:${esc(c.email)}">Correo</a>`);
+  return out.join('');
+}
+VIEW_FN.mercado = () => {
+  const all = prItems();
+  if (!all.length) {
+    return card('', emptyState('Todavía no hay prospectos.',
+      S.demo ? 'El ejemplo no trae prospectos. Sal del ejemplo para ver los tuyos.'
+        : 'El agente Mercado busca techadores, arquitectos y constructoras en el Oriente, el Suroeste, Envigado y Las Palmas cada 15 días y los deja aquí con su mensaje de presentación.'));
+  }
+  const E = prEstado();
+  const enSeg = new Set((S.data.seguimiento || []).map(x => String(x.id)));
+  const cuenta = k => all.filter(x => (x.estado || 'nuevo') === k).length;
+  const fresco = E && E.ultimaCorrida
+    ? `<div class="seg-sync">${icon('check')}<span>Mercado buscó prospectos <b>${hace(E.ultimaCorrida)}</b>${E.proxima ? ` · próxima búsqueda el ${esc(fmtDay(E.proxima))}` : ''}</span></div>` : '';
+  const top = `${fresco}<div class="kpis">
+    ${kpi('Por contactar', num(cuenta('nuevo'), 0), `${all.filter(x => (x.estado || 'nuevo') === 'nuevo' && x.prioridad === 'alta').length} de prioridad alta`)}
+    ${kpi('Contactados', num(cuenta('contactado'), 0), 'Les escribiste y no han respondido.')}
+    ${kpi('Respondieron', num(cuenta('respondio'), 0), 'Siguen en Seguimiento cuando escriben por WhatsApp.')}
+    ${kpi('Clientes', num(cuenta('cliente'), 0), `${num(cuenta('descartado'), 0)} descartados`)}
+  </div>`;
+  const fe = S.prEst || 'nuevo', fz = S.prZona || '', ft = S.prTipo || '';
+  const filt = all.filter(x => (fe === 'todos' || (x.estado || 'nuevo') === fe) && (!fz || x.zona === fz) && (!ft || x.tipo === ft))
+    .sort((a, b) => (PR_PRIO[a.prioridad] ?? 3) - (PR_PRIO[b.prioridad] ?? 3) || String(a.tipo).localeCompare(b.tipo) || String(a.nombre).localeCompare(b.nombre));
+  const n = (arr, f) => arr.filter(f).length;
+  const segE = `<div class="seg" role="group" aria-label="Filtrar por estado">${[...PR_ESTADOS, ['todos', 'Todos']].map(([k, l]) => `<button type="button" data-act="pr-f" data-k="prEst" data-v="${k}" aria-pressed="${fe === k}">${l} ${k === 'todos' ? all.length : cuenta(k)}</button>`).join('')}</div>`;
+  const pz = `<div class="pills" role="group" aria-label="Zona">${[['', 'Todas las zonas'], ...PR_ZONAS.map(z => [z, z])].map(([k, l]) => `<button type="button" class="pill" data-act="pr-f" data-k="prZona" data-v="${esc(k)}" aria-pressed="${fz === k}">${esc(l)} <span class="muted">${k ? n(all, x => x.zona === k) : all.length}</span></button>`).join('')}</div>`;
+  const pt = `<div class="pills" role="group" aria-label="Tipo">${[['', 'Todos los tipos'], ...PR_TIPOS].map(([k, l]) => `<button type="button" class="pill" data-act="pr-f" data-k="prTipo" data-v="${esc(k)}" aria-pressed="${ft === k}">${esc(l)} <span class="muted">${k ? n(all, x => x.tipo === k) : all.length}</span></button>`).join('')}</div>`;
+  const item = x => {
+    const est = x.estado || 'nuevo';
+    const wa = (x.canal || {}).whatsapp;
+    const sig = PR_ESTADOS.filter(([k]) => k !== est && k !== 'nuevo').map(([k, l]) => btn(k === 'contactado' ? 'Ya le escribí' : l, `data-act="pr-set" data-id="${esc(x.id)}" data-v="${k}"`, 'ghost sm')).join('');
+    return `<li class="pr-item">
+      <div class="pr-head"><b>${esc(x.nombre)}</b>${chip(x.tipo === 'Techador' ? 'wood' : '', x.tipo || '')}${x.prioridad === 'alta' ? chip('wood', 'Prioridad alta') : x.prioridad === 'baja' ? chip('', 'Prioridad baja') : ''}${est !== 'nuevo' ? chip(PR_TONO[est] || '', PR_LBL[est] || est) : ''}${wa && enSeg.has(String(wa)) ? chip('good', 'Ya está en Seguimiento') : ''}<span class="pr-mun">${esc(x.municipio || x.zona || '')}</span></div>
+      ${x.porQue ? `<p class="pr-why">${esc(x.porQue)}</p>` : ''}
+      ${x.senal ? `<p class="pr-sig">Señal: ${esc(x.senal)}${x.fuente ? ` · Fuente: ${esc(x.fuente)}` : ''}</p>` : ''}
+      ${x.mensaje ? `<details class="pr-msg"><summary>Mensaje de presentación</summary><p id="prm-${esc(x.id)}">${esc(x.mensaje)}</p></details>` : ''}
+      <div class="pr-acts">${prLinks(x)}${x.mensaje ? btn('Copiar mensaje', `data-act="pr-copy" data-id="${esc(x.id)}"`, 'ghost sm') : ''}<span class="sep"></span>${sig}${est !== 'nuevo' ? btn('Volver a por contactar', `data-act="pr-set" data-id="${esc(x.id)}" data-v="nuevo"`, 'ghost sm') : ''}</div>
+      ${x.estadoCuando && est !== 'nuevo' ? `<span class="pr-est">${esc(PR_LBL[est] || est)} ${hace(x.estadoCuando)}</span>` : ''}
+    </li>`;
+  };
+  const lista = filt.length ? `<ul class="pr-list">${filt.map(item).join('')}</ul>` : '<p class="muted">No hay prospectos con estos filtros.</p>';
+  const como = `<div class="note seg-note">El agente Mercado busca cada 15 días en Google Maps, Google, Instagram, ArchDaily, revistas y registros públicos. Solo guarda datos públicos del negocio. Nada se envía solo: “WhatsApp con mensaje” abre el chat con el texto escrito y tú decides si lo mandas. Cuando le escribas a alguien, márcalo con “Ya le escribí”. Si te responde, la revisión diaria lo pasa a Seguimiento.${E && E.nota ? `<br><br><b>Última búsqueda:</b> ${esc(E.nota)}` : ''}</div>`;
+  return `${top}
+    ${card('Prospectos', `<div class="pr-bar">${segE}${pz}${pt}</div>${lista}`, { sub: 'Primero los de prioridad alta. Revisa el mensaje antes de mandarlo y ajústalo si quieres.' })}
+    ${como}`;
+};
+async function prSet(t) {
+  if (S.demo) { toast('Estás viendo el ejemplo. Sal del ejemplo para cambiar datos.'); return; }
+  const rec = (S.data.prospectos || []).find(x => x.id === t.dataset.id); if (!rec) return;
+  const v = t.dataset.v;
+  try { await Store.save('prospectos', { ...clone(rec), estado: v, estadoCuando: new Date().toISOString() }); toast(`${rec.nombre}: ${PR_LBL[v] || v}`); }
+  catch (e) { toast(errMsg(e)); }
+}
+function prCopy(t) {
+  const el = document.getElementById('prm-' + t.dataset.id); const txt = el ? el.textContent : '';
+  const ok = () => toast('Mensaje copiado');
+  const manual = () => { try { el.closest('details').open = true; const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('Mensaje seleccionado: cópialo con Ctrl+C'); } catch { /* nada */ } };
+  try { navigator.clipboard.writeText(txt).then(ok, manual); } catch { manual(); }
+}
+
 /* ---------- Datos ---------- */
 VIEW_FN.datos = () => {
   const M = model();
-  const counts = COLS.map(c => [c, S.data[c].length]);
+  const counts = COLS.map(c => [c, S.data[c].filter(x => x.id !== '_estado').length]);
   const where = S.mode === 'db'
     ? 'Tus datos viven en la base de datos privada de este tablero en Claude. Los ves desde cualquier computador o celular entrando con tu cuenta, y Claude también puede leerlos y cargarlos por ti.'
     : S.mode === 'gas'
@@ -1724,7 +2272,7 @@ VIEW_FN.datos = () => {
   const claudeTxt = S.mode === 'gas'
     ? `Mándale a Claude por el chat fotos de remisiones o pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}. Claude deja los registros en la carpeta “Tablero Agrohermanos · entradas” de tu Drive y el tablero los carga solo la próxima vez que lo abras.`
     : `En el chat con Claude puedes mandar fotos de remisiones, pantallazos de WhatsApp con lo que vendió ${esc(M.cfg.socio)}, o Excel con abonos. Claude los convierte en registros de este tablero y te dice qué cargó.`;
-  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', anticipos: 'Anticipos de clientes finales', remisiones: 'Remisiones de cargue', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos', nomina: 'Nómina (pagos y extras)' };
+  const NOMBRES = { listas: 'Listas de precios', clientes: 'Clientes mayoristas', ventas: 'Pedidos (mayoristas y finales)', abonos: 'Abonos de mayoristas', anticipos: 'Anticipos de clientes finales', remisiones: 'Remisiones de cargue', bbDespachos: 'Despachos a Barro Blanco', bbVentas: 'Ventas de Barro Blanco', bbPagos: 'Pagos de Barro Blanco', pineraCompras: 'Compras a la pinera', pineraPagos: 'Pagos a la pinera', gastos: 'Gastos', nomina: 'Nómina (pagos y extras)', seguimiento: 'Contactos de WhatsApp en seguimiento', bandeja: 'Propuestas de los agentes (Bandeja)', informes: 'Informes de los agentes', inteligencia: 'Inteligencia (Yo2, clientes y competencia)', prospectos: 'Prospectos del agente Mercado', minasPedidos: 'Pedidos de minas', minasPagos: 'Pagos de minas (Madelistas y revendedores)' };
   return `<div class="grid g-1-1">
     ${card('Dónde están tus datos', `<p style="color:var(--fg-2);margin-bottom:12px">${where}</p><div class="ledger">${counts.map(([c, k]) => `<div><span>${NOMBRES[c]}</span><b>${num(k, 0)}</b></div>`).join('')}</div>`)}
     <div class="stack">
@@ -1768,7 +2316,7 @@ function lineRow(mode, l = {}) {
       <input data-k="medida" value="${esc(isR ? 'rastras' : (l.medida || ''))}" placeholder="4x6" list="dl-medidas" aria-label="Medida en pulgadas" autocomplete="off">
       <input data-k="largo" class="qty" inputmode="decimal" value="${esc(qtyIn(l.largo))}" placeholder="m" aria-label="Largo en metros"></div></div>
     <div class="field"><label>${isR ? 'Rastras' : 'Cant.'}</label><input data-k="cant" class="qty" inputmode="decimal" value="${esc(qtyIn(l.cant))}" placeholder="0" aria-label="Cantidad"></div>
-    ${mode === 'dmg' || mode === 'desp' ? '' : `<div class="field"><label>${mode === 'bbv' ? 'Precio venta' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
+    ${mode === 'dmg' || mode === 'desp' ? '' : `<div class="field"><label>${mode === 'bbv' || mode === 'mina' ? 'Precio venta' : 'Precio c/u'}</label><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(l.precio))}" placeholder="$0" data-auto="${n(l.precio) ? 0 : 1}" aria-label="Precio por unidad"></div>`}
     ${mode === 'bbv' ? `<div class="field"><label>Precio sociedad</label><input data-k="pbb" class="money" inputmode="numeric" value="${esc(moneyIn(l.pbb))}" placeholder="$0" data-auto="${n(l.pbb) ? 0 : 1}" aria-label="Precio de sociedad"></div>` : ''}
     <button type="button" class="icon-btn" data-act="rm-line" aria-label="Quitar pieza">${icon('x')}</button>
     <div class="lsub" data-sub></div>
@@ -1900,6 +2448,18 @@ const totalsBox = rows => `<div class="totals"><div class="ledger">${rows.map(([
 
 /* ---- definiciones ---- */
 const FORMS = {};
+FORMS['informe'] = {
+  eyebrow: 'Informe', cta: 'Cerrar',
+  title: r => (D().informes || []).find(x => x.id === r.id)?.titulo || 'Informe',
+  init: () => ({}),
+  body: r => {
+    const x = (D().informes || []).find(i => i.id === r.id);
+    if (!x) return '<p>No encontré este informe.</p>';
+    return `<div class="note">${esc(BAN_AGENTE[x.agente] || x.agente || 'Agente')}${x.periodo ? ' · ' + esc(x.periodo) : ''}${x.fecha ? ' · ' + esc(fmtDate(x.fecha)) : ''}</div>
+      ${x.resumen ? `<p style="font-weight:600">${esc(x.resumen)}</p>` : ''}<div class="inf-body">${mdLite(x.cuerpo)}</div>`;
+  },
+  submit: async () => closeForm(),
+};
 // Tarifas de mano de obra vigentes al registrar el despacho (para la nómina).
 const moSnap = () => ({ aserrada: n(CFG().aserrada), arriada: n(CFG().arriada) });
 const commonNote = r => fld('f-nota', 'Nota', areaF('f-nota', r.nota, 'Opcional'), { full: true });
@@ -2002,6 +2562,121 @@ FORMS['abono'] = payForm({
 const destinoTxt = (a, M = model()) => a.destino === 'pinera' ? 'pagado a la pinera' : String(a.destino || '').startsWith('nomina:') ? `pagado a ${M.trab.find(t => 'nomina:' + t.id === a.destino)?.nombre || 'un trabajador'}` : '';
 FORMS['bb-pago'] = payForm({ col: 'bbPagos', eyebrow: 'Barro Blanco', title: 'Pago de Rubén', live: () => `<div class="note">${esc(CFG().socio)} te debe hoy <b>${cop(Math.max(0, model().bbSaldo))}</b>.</div>` });
 FORMS['pinera-pago'] = payForm({ col: 'pineraPagos', eyebrow: 'La Pinera', title: 'Pago a la pinera', live: () => `<div class="note">Saldo con la pinera hoy: <b>${cop(model().pineraSaldo)}</b>.</div>` });
+
+/* ---- Minas ---- */
+// Cada pieza guarda el precio de Madelistas (plista), tu costo con el descuento (costo) y el precio de venta (precio).
+function minaLines(form, desc) {
+  const out = [];
+  let pzs = 0, ras = 0, venta = 0, costo = 0, sinCosto = 0;
+  for (const row of $$('[data-line]', form)) {
+    const l = readRow(row, 'mina'), s = row.querySelector('[data-sub]');
+    if (!l.cant) { if (s) s.textContent = l.medida && !l.ok ? 'Medida no válida: usa el formato 6x6' : ''; continue; }
+    if (!l.ok) { if (s) s.textContent = 'Medida no válida: usa el formato 6x6'; out.push(l); continue; }
+    const pl = minaPLista(l.medida, l.largo), cu = pl ? minaCostoU(pl, desc) : 0;
+    l.plista = pl; l.costo = cu;
+    pzs += l.cant; ras += l.cant * l.rastras; venta += l.cant * l.precio; costo += l.cant * cu; if (!cu) sinCosto++;
+    if (s) s.textContent = `${num(l.rastras, 4)} rastras/pza · ${pl ? `Madelistas ${cop(pl)} → te cuesta ${cop(cu)}` : 'no está en la lista de Madelistas: sin costo'} · venta ${cop(l.cant * l.precio)}${cu && l.precio ? ` · ganas ${cop(l.cant * (l.precio - cu))}` : ''}`;
+    out.push(l);
+  }
+  return { out, pzs, ras, venta, costo, sinCosto };
+}
+FORMS['mina-pedido'] = {
+  col: 'minasPedidos', eyebrow: 'Minas', title: 'Nuevo pedido de minas', cta: 'Guardar pedido', done: 'Pedido guardado',
+  init: () => ({ fecha: todayStr(), entrega: addDays(todayStr(), 18), estado: MINA_ESTADOS[0], descuento: minaCfg().descuento, items: [] }),
+  body: r => {
+    const revs = [...new Set((D().minasPedidos || []).map(p => p.revendedor).filter(Boolean))];
+    return `<div class="form-grid">
+      ${fld('f-fecha', 'Fecha del pedido', dateF('f-fecha', r.fecha))}
+      ${fld('f-entrega', 'Entrega aproximada', dateF('f-entrega', r.entrega))}
+      ${fld('f-revendedor', 'Revendedor', `<input id="f-revendedor" name="f-revendedor" value="${esc(r.revendedor || '')}" placeholder="Nombre del revendedor" list="dl-revs" autocomplete="off"><datalist id="dl-revs">${revs.map(x => `<option value="${esc(x)}">`).join('')}</datalist>`)}
+      ${fld('f-celular', 'Celular', inp('f-celular', r.celular, { ph: '300 000 0000', im: 'tel' }))}
+      ${fld('f-estado', 'Estado', selF('f-estado', r.estado || MINA_ESTADOS[0], MINA_ESTADOS))}
+      ${fld('f-desc', 'Descuento de Madelistas (%)', inp('f-desc', r.descuento ?? minaCfg().descuento, { cls: 'qty', im: 'decimal' }), { hint: 'Sobre su lista de cliente final' })}
+    </div>${linesBlock('mina', r.items)}
+    <div class="form-grid">
+      ${fld('f-flete', 'Flete cobrado al revendedor', moneyF('f-flete', r.flete), { hint: 'Se suma a la venta' })}
+      ${fld('f-costoFlete', 'Flete que pagaste', moneyF('f-costoFlete', r.costoFlete), { hint: 'Se resta de la utilidad' })}
+      ${commonNote(r)}
+    </div><div id="live"></div>${datalistMedidas(model())}`;
+  },
+  priceFor: (form, med, L) => listaPrecio(minaVenta(), med, L),
+  live: form => {
+    const t = minaLines(form, parseQty(val(form, 'f-desc')));
+    const fl = parseMoney(val(form, 'f-flete')), cf = parseMoney(val(form, 'f-costoFlete'));
+    const v = t.venta + fl, c = t.costo + cf, u = v - c;
+    const pg = S.form && !S.form.isNew ? calcMina(S.form.rec) : null;
+    return totalsBox([['Piezas', num(t.pzs, 0)], ['Rastras', num(t.ras, 3)], ['Venta al revendedor', cop(v), 1], ['Costo en Madelistas' + (cf ? ' + flete' : ''), cop(c)], ['Utilidad', `${signed(u)} · ${pct(v ? u / v : NaN)}`, 1],
+      ...(pg ? [['Pagado a Madelistas', cop(pg.pagadoProv)], ['Cobrado al revendedor', cop(pg.cobrado)]] : [])])
+      + (t.sinCosto ? `<div class="note">${t.sinCosto === 1 ? 'Una pieza no está' : `${t.sinCosto} piezas no están`} en la lista de Madelistas: pon su costo cuando Wilson te dé el precio (por ahora queda en $0).</div>` : '');
+  },
+  read: (f, r) => {
+    const desc = parseQty(val(f, 'f-desc'));
+    const t = minaLines(f, desc);
+    const bad = t.out.find(l => !l.ok);
+    if (bad) throw new Error(`La medida “${bad.medida || '(vacía)'}” no se entiende. Escríbela como 6x6 y pon el largo en metros.`);
+    const estado = val(f, 'f-estado');
+    return {
+      ...r, fecha: val(f, 'f-fecha'), entrega: val(f, 'f-entrega'), revendedor: val(f, 'f-revendedor'), celular: val(f, 'f-celular'), estado, descuento: desc,
+      entregado: estado === 'Entregado' ? (r.entregado || todayStr()) : '',
+      items: t.out.map(({ ok, ...l }) => l), flete: parseMoney(val(f, 'f-flete')), costoFlete: parseMoney(val(f, 'f-costoFlete')), nota: val(f, 'f-nota'),
+    };
+  },
+  validate: d => !isDate(d.fecha) ? 'Pon la fecha del pedido.' : !d.items.length ? 'Agrega al menos una pieza con cantidad.' : '',
+  remove: async r => {
+    // Borra también los pagos de este pedido para que no queden sueltos.
+    for (const x of (D().minasPagos || []).filter(x => x.pedidoId === r.id)) await Store.remove('minasPagos', x.id);
+    await Store.remove('minasPedidos', r.id);
+  },
+};
+const minaPedidoSel = r => {
+  const ps = minaPedidos().map(p => [p.id, `${minaNombre(p)} · ${fmtDate(p.fecha)} · ${num(calcMina(p).piezas, 0)} pzs`]);
+  return fld('f-pedido', 'Pedido', ps.length ? selF('f-pedido', r.pedidoId || ps[0][0], ps) : '<div class="note">Primero registra el pedido de minas.</div>', { full: true });
+};
+const minaPagoNote = (form, tipo) => {
+  const p = minaPedidos().find(x => x.id === val(form, 'f-pedido')); if (!p) return '';
+  const k = calcMina(p);
+  return tipo === 'cliente'
+    ? `<div class="note">${esc(minaNombre(p))} debe <b>${cop(Math.max(0, k.porCobrar))}</b> de este pedido (venta ${cop(k.venta)}, ya pagó ${cop(k.cobrado)}).</div>`
+    : `<div class="note">A Madelistas le debes <b>${cop(Math.max(0, k.debeProv))}</b> de este pedido (costo ${cop(k.costoMadera)}, ya pagaste ${cop(k.pagadoProv)}).</div>`;
+};
+FORMS['mina-pago'] = payForm({
+  col: 'minasPagos', eyebrow: 'Minas', title: 'Pago a Madelistas',
+  extra: r => minaPedidoSel(r), readExtra: f => ({ pedidoId: val(f, 'f-pedido'), tipo: 'proveedor' }),
+  live: form => minaPagoNote(form, 'proveedor'),
+});
+FORMS['mina-cobro'] = payForm({
+  col: 'minasPagos', eyebrow: 'Minas', title: 'Pago del revendedor',
+  extra: r => minaPedidoSel(r), readExtra: f => ({ pedidoId: val(f, 'f-pedido'), tipo: 'cliente' }),
+  live: form => minaPagoNote(form, 'cliente'),
+});
+const minaPrecioRow = x => `<div class="pago mprecio" data-mprecio><input data-k="medida" value="${esc(x.medida || '')}" placeholder="6x6" aria-label="Medida"><input data-k="largo" class="qty" inputmode="decimal" value="${esc(qtyIn(x.largo))}" placeholder="Largo (m)" aria-label="Largo en metros"><input data-k="precio" class="money" inputmode="numeric" value="${esc(moneyIn(x.precio))}" placeholder="$ venta" aria-label="Precio de venta"><button type="button" class="icon-btn" data-act="rm-row" aria-label="Quitar">${icon('x')}</button></div>`;
+FORMS['mina-precios'] = {
+  eyebrow: 'Minas', title: 'Precios de minas', cta: 'Guardar precios', done: 'Precios guardados', accion: true,
+  init: () => {
+    const mc = minaCfg(), rows = [];
+    for (const [k, row] of Object.entries(mc.venta || {})) for (const [cm, p] of Object.entries(row || {})) rows.push({ medida: k.replace(/_/g, ','), largo: +cm / 100, precio: p });
+    return { descuento: mc.descuento, proveedor: mc.proveedor, rows };
+  },
+  body: r => `<div class="form-grid">
+      ${fld('f-prov', 'Proveedor', inp('f-prov', r.proveedor))}
+      ${fld('f-desc', 'Descuento de Madelistas (%)', inp('f-desc', r.descuento, { cls: 'qty', im: 'decimal' }), { hint: 'Sobre su lista de cliente final. Cambia el costo de los pedidos nuevos.' })}
+    </div>
+    <div class="form-sec"><h4>Precio de venta a los revendedores</h4><span class="muted" style="font-size:11.5px">Medida, largo y precio por pieza</span></div>
+    <div class="pagos" id="mprecios">${(r.rows.length ? r.rows : [{}]).map(minaPrecioRow).join('')}</div>
+    <div>${btn(`${icon('plus')}Agregar precio`, 'data-act="add-mprecio"', 'sm')}</div>`,
+  read: f => {
+    const venta = {};
+    for (const row of $$('[data-mprecio]', f)) {
+      const g = k => row.querySelector(`[data-k="${k}"]`).value;
+      const m = parseMedida(g('medida')), L = parseQty(g('largo')), p = parseMoney(g('precio'));
+      if (!g('medida').trim() && !p) continue;
+      if (!m || !L || !p) throw new Error(`Revisa “${g('medida') || '(sin medida)'}”: pon medida (6x6), largo en metros y precio.`);
+      (venta[m.key] = venta[m.key] || {})[largoKey(L)] = p;
+    }
+    return { proveedor: val(f, 'f-prov') || 'Madelistas', descuento: parseQty(val(f, 'f-desc')), venta };
+  },
+  save: d => Store.saveConfig({ minas: { ...minaCfg(), ...d } }),
+};
 
 FORMS['cliente'] = {
   col: 'clientes', eyebrow: 'Mayoristas', title: 'Nuevo cliente mayorista', cta: 'Guardar cliente', done: 'Cliente guardado',
@@ -2604,13 +3279,13 @@ FORMS['anticipo'] = {
 /* ---- Menú de tres puntos de cada cliente final ---- */
 // Estado de cuenta de un cliente en el panel lateral (desde el menú de cada cliente final).
 FORMS['cuenta'] = {
-  eyebrow: 'Estado de cuenta', cta: 'Cerrar',
+  eyebrow: 'Historial del cliente', cta: 'Cerrar',
   title: r => model().cli.get(r.clienteId)?.nombre || 'Cliente',
   init: () => ({}),
   body: r => {
     const k = cuentaMovs(r.clienteId); if (!k) return '<p>No encontré este cliente.</p>';
-    return `<div class="inv-res"><div><span>Compras</span><b>${cop(k.compras, true)}</b></div><div><span>${k.c.tipo === 'final' ? 'Pagos y anticipos' : 'Abonos'}</span><b>${cop(k.abonos, true)}</b></div><div><span>Saldo hoy</span><b>${saldoTxt(k.saldo)}</b></div></div>
-      <p class="muted" style="font-size:12.5px;margin:0">Del más viejo al más nuevo, con el saldo después de cada movimiento. Toca una fila para abrirla.</p>
+    return `${cuentaResumen(k)}
+      <p class="muted" style="font-size:12.5px;margin:0">Cada venta con la mercancía que se le mandó, cada ${k.c.tipo === 'final' ? 'pago o anticipo' : 'abono'} y cómo quedó el saldo después, del más viejo al más nuevo. Toca una fila para abrirla.${k.c.tipo === 'final' ? ` ${btn('Editar datos del cliente', `data-act="edit" data-col="clientes" data-id="${esc(r.clienteId)}"`, 'ghost sm')}` : ''}</p>
       ${cuentaTabla(r.clienteId)}
       <div class="pills">${btn(`${icon('plus')}${k.c.tipo === 'final' ? 'Anticipo' : 'Abono'}`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'anticipo' : 'abono'}" data-cli="${esc(r.clienteId)}"`, 'sm')}${btn(`${icon('plus')}Pedido`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'venta-final' : 'venta-mayorista'}" data-cli="${esc(r.clienteId)}"`, 'sm')}</div>`;
   },
@@ -3176,6 +3851,7 @@ const EDIT_KIND = {
   bbDespachos: r => r.tipo === 'devolucion' ? 'bb-devolucion' : 'bb-despacho', bbVentas: r => r.danada ? 'bb-danada' : 'bb-venta', bbPagos: () => 'bb-pago',
   pineraCompras: () => 'pinera-compra', pineraPagos: () => 'pinera-pago', gastos: () => 'gasto', listas: () => 'lista',
   nomina: r => r.tipo === 'cargo' ? 'nomina-cargo' : 'nomina-pago',
+  minasPedidos: () => 'mina-pedido', minasPagos: r => r.tipo === 'cliente' ? 'mina-cobro' : 'mina-pago',
 };
 
 function openForm(kind, rec, prefill, ai) {
@@ -3385,7 +4061,7 @@ function buildDemo() {
   nomina.push({ id: 'dn-x', tipo: 'cargo', trabajadorId: 'demo-t2', fecha: addDays(hoy, -9), concepto: 'Día de cargue (ejemplo)', valor: 60000 });
   const fpe = ventas.filter(v => v.canal === 'final' && (v.estado || 'Pendiente') === 'Pendiente')[0];
   const anticipos = fpe ? [{ id: 'dant1', clienteId: '', pedidoId: fpe.id, fecha: fpe.fecha, valor: Math.round(sum(fpe.items, l => l.cant * l.precio) * 0.3 / 100) * 100, medio: 'Transferencia', nota: 'Anticipo del 30% (ejemplo)' }] : [];
-  return { listas, clientes, ventas, abonos, anticipos, remisiones: [], bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina };
+  return { listas, clientes, ventas, abonos, anticipos, remisiones: [], bbDespachos, bbVentas, bbPagos, pineraCompras, pineraPagos, gastos, nomina, seguimiento: [] };
 }
 
 /* =========================================================================
@@ -3410,7 +4086,8 @@ document.addEventListener('click', e => {
   if (!t) return;
   const a = t.dataset.act;
   switch (a) {
-    case 'nav': S.view = t.dataset.v; pref.set('view', S.view); render(); window.scrollTo(0, 0); break;
+    case 'nav': if (t.dataset.v === 'equipo') { toggleMenu(false); if (window.AHOficina) window.AHOficina.abrir(t); break; }
+      S.view = t.dataset.v; pref.set('view', S.view); render(); window.scrollTo(0, 0); break;
     case 'range': S.range = t.dataset.r; pref.set('range', S.range); render(); break;
     case 'menu': toggleMenu(); break;
     case 'form': toggleMenu(false); cerrarPop(); openForm(t.dataset.form, null, prefillDe(t.dataset, t.dataset.form)); break;
@@ -3438,7 +4115,8 @@ document.addEventListener('click', e => {
     }
     case 'add-pago': $('#pagos').insertAdjacentHTML('beforeend', pagoRow({})); recalcForm(); break;
     case 'add-tramo': $('#tramos').insertAdjacentHTML('beforeend', tramoRow({})); break;
-    case 'rm-row': t.closest('[data-pago],[data-tramo],[data-trab],[data-periodo]').remove(); recalcForm(); break;
+    case 'add-mprecio': $('#mprecios').insertAdjacentHTML('beforeend', minaPrecioRow({})); break;
+    case 'rm-row': t.closest('[data-pago],[data-tramo],[data-trab],[data-periodo],[data-mprecio]').remove(); recalcForm(); break;
     case 'add-trab': $('#trabs').insertAdjacentHTML('beforeend', trabRow({})); break;
     case 'add-periodo': $('#periodos').insertAdjacentHTML('beforeend', periodoRow({ desde: todayStr(), hasta: '' })); break;
     case 'pauta-switch': {
@@ -3459,6 +4137,17 @@ document.addEventListener('click', e => {
     case 'cm': S.costMode = t.dataset.m; render(); break;
     case 'campana-edit': { const c = campanas().find(x => x.id === t.dataset.id); if (c) openForm('campana', c); break; }
     case 'pauta-mes': openForm('pauta-real', null, { mes: t.dataset.mes }); break;
+    case 'seg-menu': segMenu(t); break;
+    case 'seg-set': segSet(t); break;
+    case 'seg-mas': S.segMas = { ...(S.segMas || {}), [t.dataset.k]: !(S.segMas && S.segMas[t.dataset.k]) }; render(); break;
+    case 'pr-f': S[t.dataset.k] = t.dataset.v; pref.set(t.dataset.k, t.dataset.v); render(); break;
+    case 'pr-set': prSet(t); break;
+    case 'pr-copy': prCopy(t); break;
+    case 'seg-f': S.segFiltro = t.dataset.f; pref.set('segFiltro', S.segFiltro); render(); break;
+    case 'ban-tab': S.banTab = t.dataset.t; render(); break;
+    case 'ban-set': banSet(t); break;
+    case 'ban-copy': banCopy(t); break;
+    case 'informe': openForm('informe', { id: t.dataset.id }); break;
     case 'export-json': exportJSON(); break;
     case 'export-csv': exportCSV(); break;
     case 'import': $('#import-file').click(); break;
@@ -3475,6 +4164,14 @@ document.addEventListener('input', e => {
   if (t.dataset && t.dataset.range) {
     if (t.dataset.range === 'from') S.customFrom = t.value; else S.customTo = t.value;
     if (isDate(t.value)) render();
+    return;
+  }
+  if (t.dataset && t.dataset.banTxt) {
+    // El mensaje corregido se guarda aquí hasta que lo marques enviado; el enlace de WhatsApp lleva el texto nuevo.
+    S.banEdit = { ...(S.banEdit || {}), [t.dataset.banTxt]: t.value };
+    const a = $(`[data-ban-wa="${CSS.escape(t.dataset.banTxt)}"]`);
+    const b = banItems().find(x => x.id === t.dataset.banTxt);
+    if (a && b) a.href = banWaHref(b);
     return;
   }
   if (t.hasAttribute && t.hasAttribute('data-calc')) {
@@ -3509,6 +4206,7 @@ document.addEventListener('change', e => {
 document.addEventListener('error', e => { const t = e.target; if (t && t.tagName === 'IMG' && t.closest('.thumb')) t.closest('.thumb').classList.add('roto'); }, true);
 document.addEventListener('focusout', e => {
   const t = e.target;
+  if (t.dataset && t.dataset.banTxt && S.renderLater) { S.renderLater = false; setTimeout(render, 300); }
   if (t.matches && t.matches('input.money')) { const v = parseMoney(t.value); t.value = v ? moneyIn(v) : ''; }
 });
 $('#form').addEventListener('submit', submitForm);
@@ -3522,12 +4220,23 @@ window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(draw
   S.range = pref.get('range', 'mes');
   if (!RANGES.some(r => r[0] === S.range)) S.range = 'mes';
   S.view = pref.get('view', 'resumen');
+  S.segFiltro = pref.get('segFiltro', 'abiertos');
+  S.prEst = pref.get('prEst', 'nuevo'); S.prZona = pref.get('prZona', ''); S.prTipo = pref.get('prTipo', '');
   const h = (location.hash || '').slice(1);
   if (h === 'demo') S.demo = true;
+  else if (h === 'equipo') setTimeout(() => { if (window.AHOficina) window.AHOficina.abrir(); }, 0);
   else if (VIEWS.some(v => v.id === h)) S.view = h;
   else if (h === 'pinera' || h === 'gastos') S.view = 'compras';
   if (S.view === 'pinera' || S.view === 'gastos') S.view = 'compras';
-  if (!VIEWS.some(v => v.id === S.view)) S.view = 'resumen';
+  if (!VIEWS.some(v => v.id === S.view) || S.view === 'equipo') S.view = 'resumen';
+  window.addEventListener('ah-equipo', () => renderNav());
+  // La oficina 3D lee de aquí lo que se carga, la plata que entra, las alarmas y las metas.
+  window.AHTablero = {
+    model: () => model(), seg: () => segModel(), banPend: () => banPendientes(), cfg: () => CFG(),
+    cop: (v, c) => cop(v, c), num: (v, d) => num(v, d), fmtDay: f => fmtDay(f), demo: () => !!S.demo,
+    listo: () => S.mode === 'local' || S.mode === 'gas' || (S.mode === 'db' && S.loaded.size >= COLS.length + 1),
+    guardarMeta: m => Store.saveConfig(m),
+  };
   render();
   Store.init();
   (async () => {
