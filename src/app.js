@@ -731,7 +731,8 @@ function hbars(items, { fmt, color = 'var(--s1)', max } = {}) {
 /* =========================================================================
    Piezas de interfaz
    ========================================================================= */
-const kpi = (label, value, sub = '', o = {}) => `<div class="kpi${o.go ? ' go' : ''}"${o.go ? ` data-act="nav" data-v="${o.go}" role="button" tabindex="0" title="Ver ${esc(VIEWS.find(v => v.id === o.go)?.label || '')}"` : ''}><div class="kpi-l">${o.dot ? `<i style="background:${o.dot}"></i>` : ''}${label}</div><div class="kpi-v ${o.cls || ''}">${value}</div>${sub ? `<div class="kpi-s">${sub}</div>` : ''}</div>`;
+// Con o.det la tarjeta se despliega: al tocarla sale debajo de dónde sale el número (ver DET).
+const kpi = (label, value, sub = '', o = {}) => o.det ? `<div class="kpi det${S.det === o.det ? ' open' : ''}" data-act="det" data-det="${o.det}" role="button" tabindex="0" aria-expanded="${S.det === o.det}" title="Toca para ver el detalle">` + `<div class="kpi-l">${o.dot ? `<i style="background:${o.dot}"></i>` : ''}${label}</div><div class="kpi-v ${o.cls || ''}">${value}</div>${sub ? `<div class="kpi-s">${sub}</div>` : ''}</div>` : `<div class="kpi${o.go ? ' go' : ''}"${o.go ? ` data-act="nav" data-v="${o.go}" role="button" tabindex="0" title="Ver ${esc(VIEWS.find(v => v.id === o.go)?.label || '')}"` : ''}><div class="kpi-l">${o.dot ? `<i style="background:${o.dot}"></i>` : ''}${label}</div><div class="kpi-v ${o.cls || ''}">${value}</div>${sub ? `<div class="kpi-s">${sub}</div>` : ''}</div>`;
 const card = (title, body, o = {}) => `<section class="card ${o.cls || ''}">${title ? `<header class="card-h"><div><h3>${title}</h3>${o.sub ? `<p>${o.sub}</p>` : ''}</div>${o.acts ? `<div class="acts">${o.acts}</div>` : ''}</header>` : ''}${body}</section>`;
 const chip = (tone, text, ic) => `<span class="chip ${tone}">${ic ? icon(ic) : ''}${esc(text)}</span>`;
 const btn = (label, attrs, cls = '') => `<button type="button" class="btn ${cls}" ${attrs}>${label}</button>`;
@@ -845,6 +846,7 @@ function render() {
   const vw = $('#view');
   vw.classList.toggle('enter', S.lastView !== v.id); S.lastView = v.id;
   vw.innerHTML = html;
+  pintarDetalle(R);
   cargarMiniaturas();
   drawCharts();
 }
@@ -955,18 +957,19 @@ function pendientes(M) {
   ], PE, { act: p => editAttr(p.col || 'ventas', p.id), empty: '<p class="muted">No hay pedidos por entregar.</p>',
     foot: PE.length > 1 ? ['Total', '', cop(sum(PE, p => p.calc.total)), cop(sum(PE, p => p.calc.pagado)), cop(sum(PE, p => Math.max(0, p.calc.total - p.calc.pagado))), ''] : null });
 
-  const fila = (label, sub, v, view) => `<div${view ? ` class="lk" data-act="nav" data-v="${view}" role="button" tabindex="0"` : ''}><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${cop(v)}</b></div>`;
+  // view "cuenta:<id>" abre la ficha del cliente; si no, lleva a la sección.
+  const fila = (label, sub, v, view) => `<div${view ? ` class="lk" ${String(view).startsWith('cuenta:') ? `data-act="cuenta" data-id="${esc(view.slice(7))}" title="Ver la ficha de ${esc(label)}"` : `data-act="nav" data-v="${view}"`} role="button" tabindex="0"` : ''}><span>${esc(label)}${sub ? `<small>${esc(sub)}</small>` : ''}</span><b>${cop(v)}</b></div>`;
   const deben = [], debes = [];
   for (const k of M.cartera.values()) {
-    if (k.saldo > 0.5) deben.push([k.cliente.nombre, ['Mayorista', k.vencido > 0.5 ? `${cop(k.vencido)} vencido` : '', k.porEntregar > 0.5 ? `${cop(k.porEntregar, true)} de pedido por entregar` : '', !k.vencido && !k.porEntregar && k.prox ? `vence el ${fmtDay(k.prox)}` : ''].filter(Boolean).join(' · '), k.saldo, 'mayoristas']);
-    else if (k.saldo < -0.5) debes.push([k.cliente.nombre, 'Saldo a favor del mayorista · se descuenta del próximo pedido', -k.saldo, 'mayoristas']);
+    if (k.saldo > 0.5) deben.push([k.cliente.nombre, ['Mayorista', k.vencido > 0.5 ? `${cop(k.vencido)} vencido` : '', k.porEntregar > 0.5 ? `${cop(k.porEntregar, true)} de pedido por entregar` : '', !k.vencido && !k.porEntregar && k.prox ? `vence el ${fmtDay(k.prox)}` : ''].filter(Boolean).join(' · '), k.saldo, 'cuenta:' + k.cliente.id]);
+    else if (k.saldo < -0.5) debes.push([k.cliente.nombre, 'Saldo a favor del mayorista · se descuenta del próximo pedido', -k.saldo, 'cuenta:' + k.cliente.id]);
   }
   if (M.bbSaldo > 0.5) deben.push([M.cfg.socio, `Ventas de ${M.cfg.punto}`, M.bbSaldo, 'bb']);
   if (M.bbPorEntregar > 0.5) deben.push([M.cfg.socio, `Ventas de la sociedad por entregar · lo que te liquida`, M.bbPorEntregar, 'bb']);
   const finDeben = new Map();
-  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) { const r = finDeben.get(e.cliente) || { v: 0, desp: 0, pend: 0, ant: 0 }; r.v += e.calc.saldo; r.desp++; finDeben.set(e.cliente, r); }
-  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.saldo > 0.5) { const r = finDeben.get(p.cliente) || { v: 0, desp: 0, pend: 0, ant: 0 }; r.v += p.calc.saldo; r.pend++; r.ant += p.calc.pagado; finDeben.set(p.cliente, r); }
-  for (const [nm, r] of finDeben) deben.push([nm, ['Cliente final', r.desp ? `${r.desp} ${r.desp === 1 ? 'pedido despachado' : 'pedidos despachados'}` : '', r.pend ? `${r.pend === 1 ? 'pedido' : r.pend + ' pedidos'} por entregar` : '', r.ant > 0.5 ? `ya dio ${cop(r.ant, true)} de anticipo` : ''].filter(Boolean).join(' · '), r.v, 'final']);
+  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) { const r = finDeben.get(e.cliente) || { v: 0, desp: 0, pend: 0, ant: 0, id: e.ref.clienteId || '' }; r.v += e.calc.saldo; r.desp++; finDeben.set(e.cliente, r); }
+  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.saldo > 0.5) { const r = finDeben.get(p.cliente) || { v: 0, desp: 0, pend: 0, ant: 0, id: p.ref.clienteId || '' }; r.v += p.calc.saldo; r.pend++; r.ant += p.calc.pagado; finDeben.set(p.cliente, r); }
+  for (const [nm, r] of finDeben) deben.push([nm, ['Cliente final', r.desp ? `${r.desp} ${r.desp === 1 ? 'pedido despachado' : 'pedidos despachados'}` : '', r.pend ? `${r.pend === 1 ? 'pedido' : r.pend + ' pedidos'} por entregar` : '', r.ant > 0.5 ? `ya dio ${cop(r.ant, true)} de anticipo` : ''].filter(Boolean).join(' · '), r.v, r.id && M.cli.has(r.id) ? 'cuenta:' + r.id : 'final']);
   if (M.pineraSaldo > 0.5) debes.push(['La pinera', 'Compra de madera', M.pineraSaldo, 'compras']);
   // Minas: lo que deben los revendedores y lo que le debes a Madelistas.
   try {
@@ -977,7 +980,7 @@ function pendientes(M) {
   } catch { /* sin minas */ }
   for (const t of M.trab) { const v = M.nominaSaldo.get(t.id) || 0; if (v > 0.5) debes.push([t.nombre, `Nómina · se paga el sábado ${fmtDay(sabadoDe(M.hoy))}`, v, 'nomina']); }
   // Un anticipo de un pedido no es plata que debas (debes la madera). Solo cuenta el que no tiene pedido.
-  for (const [cid, v] of M.anticipoLibre) debes.push([M.cli.get(cid)?.nombre || 'Cliente final', 'Anticipo sin pedido · se descuenta del próximo', v, 'final']);
+  for (const [cid, v] of M.anticipoLibre) debes.push([M.cli.get(cid)?.nombre || 'Cliente final', 'Anticipo sin pedido · se descuenta del próximo', v, M.cli.has(cid) ? 'cuenta:' + cid : 'final']);
   const bloque = (titulo, rows, vacio) => `<h4 class="ldg-h">${titulo}</h4><div class="ledger">${rows.length ? rows.sort((a, b) => b[2] - a[2]).map(r => fila(...r)).join('') + (rows.length > 1 ? `<div class="total"><span>Total</span><b>${cop(sum(rows, r => r[2]))}</b></div>` : '') : `<div><span class="muted">${vacio}</span><b></b></div>`}</div>`;
   const deudas = bloque('Te deben', deben, 'Nadie te debe.') + bloque('Tú debes', debes, 'No debes nada.');
   return `<div class="grid g-2-1">
@@ -996,16 +999,16 @@ VIEW_FN.resumen = R => {
   const porRastra = P.rastras ? P.utilN / P.rastras : 0;
 
   const top = `<div class="kpis">
-    ${kpi('Ventas', cop(P.ingreso), `${P.E.length} ${P.E.length === 1 ? 'venta' : 'ventas'}${Q ? ' ' + delta(P.ingreso, Q.ingreso) : ''}`)}
-    ${kpi('Utilidad neta', signed(P.utilN), `Margen ${pct(margen)}${Q ? ' ' + delta(P.utilN, Q.utilN) : ''}`, { cls: '' })}
-    ${kpi('Rastras vendidas', num(P.rastras, 2), `${num(P.piezas, 0)} piezas`)}
-    ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas')}
+    ${kpi('Ventas', cop(P.ingreso), `${P.E.length} ${P.E.length === 1 ? 'venta' : 'ventas'}${Q ? ' ' + delta(P.ingreso, Q.ingreso) : ''}`, { det: 'home:ventas' })}
+    ${kpi('Utilidad neta', signed(P.utilN), `Margen ${pct(margen)}${Q ? ' ' + delta(P.utilN, Q.utilN) : ''}`, { det: 'home:utilidad' })}
+    ${kpi('Rastras vendidas', num(P.rastras, 2), `${num(P.piezas, 0)} piezas`, { det: 'home:rastras' })}
+    ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas', { det: 'home:porRastra' })}
   </div>`;
   const pos = `<div class="kpis soft">
-    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar, true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm', go: 'mayoristas' })}
-    ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), Math.abs(M.pineraSaldo) < 0.5 ? 'Sin saldo' : M.pineraSaldo > 0 ? 'Le debes' : 'A tu favor', { cls: 'sm', go: 'compras' })}
-    ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal)} a precio de venta`, { cls: 'sm', go: 'bb' })}
-    ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm', go: 'compras' })}
+    ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar, true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm', det: 'home:cobrar' })}
+    ${kpi('Saldo con la pinera', M.pineraSaldo >= 0 ? cop(M.pineraSaldo) : cop(-M.pineraSaldo), Math.abs(M.pineraSaldo) < 0.5 ? 'Sin saldo' : M.pineraSaldo > 0 ? 'Le debes' : 'A tu favor', { cls: 'sm', det: 'home:pinera' })}
+    ${kpi(`Inventario en ${esc(M.cfg.punto)}`, `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal)} a precio de venta`, { cls: 'sm', det: 'home:inv' })}
+    ${kpi('Gastos del período', cop(P.gastos), `${P.G.length} ${P.G.length === 1 ? 'registro' : 'registros'}${P.pauta ? ` + ${cop(P.pauta, true)} de pauta` : ''}${P.extras ? ` + ${cop(P.extras, true)} de nómina extra` : ''} · ya restados de la utilidad`, { cls: 'sm', det: 'home:gastos' })}
   </div>`;
 
   if (!M.firstDate) return top + pendientes(M) + onboarding();
@@ -1084,10 +1087,10 @@ VIEW_FN.mayoristas = R => {
   const saldoTot = sum(carSel, c => Math.max(0, c.saldo)), antTot = sum(carSel, c => Math.max(0, -c.saldo));
 
   const kp = `<div class="kpis">
-    ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)' })}
-    ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
-    ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`)}
-    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${(x => x > 0.5 ? ` · ${cop(x)} de pedidos por entregar` : '')(sum(carSel, c => c.porEntregar))}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`)}
+    ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)', det: 'may:ventas' })}
+    ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`, { det: 'may:utilidad' })}
+    ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`, { det: 'may:rastras' })}
+    ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${(x => x > 0.5 ? ` · ${cop(x)} de pedidos por entregar` : '')(sum(carSel, c => c.porEntregar))}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`, { det: 'may:cartera' })}
   </div>`;
   const ped = table([
     { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
@@ -1116,7 +1119,7 @@ VIEW_FN.mayoristas = R => {
     { h: 'Total', r: 1, f: p => cop(p.calc.total) },
     { h: 'Utilidad esperada', r: 1, f: p => signed(p.calc.util) },
   ], PE, { act: p => editAttr('ventas', p.id) }), { sub: 'Pedidos en producción. Ya cuentan como lo que te deben; cuentan como venta cuando los marques como entregados.' }) : '';
-  const cuentaCard = sel ? `<div id="cuenta">${card(`Historial · ${esc(M.cli.get(sel).nombre)}`, cuentaResumen(cuentaMovs(sel, M)) + cuentaTabla(sel, M), { sub: 'Cada venta con la mercancía que se le mandó, cada abono y cómo quedó el saldo después, del más viejo al más nuevo. Toca una fila para abrirla.', acts: btn(`${icon('plus')}Abono`, `data-act="form" data-form="abono" data-cli="${esc(sel)}"`, 'sm') + btn(`${icon('plus')}Pedido`, `data-act="form" data-form="venta-mayorista" data-cli="${esc(sel)}"`, 'sm') + btn('Cerrar', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') })}</div>` : '';
+  const cuentaCard = sel ? `<div id="cuenta">${card(`Historial · ${esc(M.cli.get(sel).nombre)}`, fichaCliente(sel, M) + cuentaResumen(cuentaMovs(sel, M)) + cuentaTabla(sel, M), { sub: 'Cada venta con la mercancía que se le mandó, cada abono y cómo quedó el saldo después, del más viejo al más nuevo. Toca una fila para abrirla.', acts: btn(`${icon('plus')}Abono`, `data-act="form" data-form="abono" data-cli="${esc(sel)}"`, 'sm') + btn(`${icon('plus')}Pedido`, `data-act="form" data-form="venta-mayorista" data-cli="${esc(sel)}"`, 'sm') + btn('Cerrar', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') })}</div>` : '';
   return `${head}<div class="clients">${cards}</div>${cuentaCard}${peCard}${kp}
     ${card(sel ? `Pedidos de ${esc(M.cli.get(sel).nombre)}` : 'Pedidos', ped, { acts: sel ? btn('Ver todos', `data-act="cli" data-id="${esc(sel)}"`, 'ghost sm') : '' })}
     <div class="grid g-1-1">
@@ -1124,6 +1127,417 @@ VIEW_FN.mayoristas = R => {
       ${card('Abonos', ab)}
     </div>`;
 };
+
+/* =========================================================================
+   Desplegables: cada tarjeta de número se abre debajo y explica de dónde
+   sale ese número, con todo el detalle (cada fila abre el registro).
+   ========================================================================= */
+const DET = {};
+const rangoTxt = R => R.from === R.to ? `el ${fmtDate(R.from)}` : `del ${fmtDate(R.from)} al ${fmtDate(R.to)}`;
+const detP = html => `<p class="det-exp">${html}</p>`;
+const detH = t => `<h4 class="ldg-h">${t}</h4>`;
+// Filas [texto, valor, { sub, total, act }] — act es un atributo data-act para abrir algo.
+const detLedger = rows => `<div class="ledger">${rows.filter(Boolean).map(([l, v, o = {}]) => `<div${o.total ? ' class="total"' : o.act ? ` class="lk" ${o.act} role="button" tabindex="0"` : ''}><span>${l}${o.sub ? `<small>${o.sub}</small>` : ''}</span><b>${v}</b></div>`).join('')}</div>`;
+const detCols = (...c) => `<div class="det-cols">${c.filter(Boolean).map(x => `<div>${x}</div>`).join('')}</div>`;
+const detIr = (view, label) => `<div class="det-acts">${btn(`${esc(label)} →`, `data-act="nav" data-v="${view}"`, 'sm')}</div>`;
+const canalChip = k => `<span class="chip" style="gap:6px"><i style="width:8px;height:8px;border-radius:2px;background:${CANAL[k].color}"></i>${CANAL[k].label}</span>`;
+const agrupar = (arr, key) => { const m = new Map(); for (const x of arr) { const k = key(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; };
+const cuentaAttr = (id, M = model()) => id && M.cli.has(id) ? `data-act="cuenta" data-id="${esc(id)}"` : '';
+const porRastraTxt = (v, r) => r ? cop(v / r) : '—';
+
+// Lista de ventas: cada una se abre.
+function detVentas(E, o = {}) {
+  const rows = o.orden === 'util' ? E.slice().sort((a, b) => b.util - a.util) : E.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const max = o.max || 80, vis = rows.slice(0, max), canal = o.canal !== false;
+  return table([
+    { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
+    ...(canal ? [{ h: 'Canal', f: e => canalChip(e.canal) }] : []),
+    { h: 'Cliente', f: e => `<span class="cell-strong">${esc(e.canal === 'bb' && e.ref.cliente ? `${e.cliente} · ${e.ref.cliente}` : e.cliente)}</span>` },
+    { h: 'Mercancía', f: e => detalle(e.lines) },
+    { h: 'Rastras', r: 1, f: e => num(e.rastras) },
+    { h: o.ventaLbl || 'Venta', r: 1, f: e => cop(e.ingreso) },
+    { h: 'Costo', r: 1, f: e => cop(e.costo) },
+    { h: 'Utilidad', r: 1, f: e => `${signed(e.util)}<span class="sub">${pct(e.ingreso ? e.util / e.ingreso : NaN)}</span>` },
+  ], vis, {
+    act: e => editAttr(e.src, e.id), empty: '<p class="muted">No hay ventas en este rango.</p>',
+    foot: vis.length > 1 && !o.max ? ['Total', ...(canal ? [''] : []), '', '', num(sum(rows, e => e.rastras)), cop(sum(rows, e => e.ingreso)), cop(sum(rows, e => e.costo)), signed(sum(rows, e => e.util))] : null,
+  }) + (rows.length > vis.length && !o.max ? `<p class="muted" style="font-size:12px;margin-top:6px">Se muestran las ${vis.length} más recientes de ${rows.length}.</p>` : '');
+}
+function detPorCanal(E, o = {}) {
+  const tot = sum(E, e => e.ingreso);
+  const rows = ['mayorista', 'bb', 'final'].map(k => { const X = E.filter(e => e.canal === k); return { k, n: X.length, ras: sum(X, e => e.rastras), v: sum(X, e => e.ingreso), c: sum(X, e => e.costo), u: sum(X, e => e.util) }; }).filter(r => r.n);
+  return table([
+    { h: 'Canal', f: r => canalChip(r.k) },
+    { h: 'Ventas', r: 1, f: r => num(r.n, 0) },
+    { h: 'Rastras', r: 1, f: r => num(r.ras) },
+    ...(o.rastra ? [
+      { h: 'Venta/rastra', r: 1, f: r => porRastraTxt(r.v, r.ras) },
+      { h: 'Costo/rastra', r: 1, f: r => porRastraTxt(r.c, r.ras) },
+      { h: 'Utilidad/rastra', r: 1, f: r => r.ras ? signed(r.u / r.ras) : '—' },
+    ] : [
+      { h: 'Valor', r: 1, f: r => `${cop(r.v)}<span class="sub">${pct(tot ? r.v / tot : NaN)} del total</span>` },
+      { h: 'Utilidad', r: 1, f: r => `${signed(r.u)}<span class="sub">margen ${pct(r.v ? r.u / r.v : NaN)}</span>` },
+    ]),
+  ], rows, { empty: '<p class="muted">Sin ventas en este rango.</p>' });
+}
+function detPorCliente(E, top = 10) {
+  const M = model();
+  const g = [...agrupar(E, e => e.ref.clienteId || e.cliente)].map(([k, X]) => ({ k, nombre: X[0].cliente, id: X[0].ref.clienteId || '', n: X.length, v: sum(X, e => e.ingreso), u: sum(X, e => e.util), ras: sum(X, e => e.rastras) })).sort((a, b) => b.v - a.v);
+  return table([
+    { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span>${cuentaAttr(r.id, M) ? '<span class="sub">Toca para ver su ficha</span>' : ''}` },
+    { h: 'Ventas', r: 1, f: r => num(r.n, 0) },
+    { h: 'Rastras', r: 1, f: r => num(r.ras) },
+    { h: 'Valor', r: 1, f: r => cop(r.v) },
+    { h: 'Utilidad', r: 1, f: r => signed(r.u) },
+  ], g.slice(0, top), { act: r => cuentaAttr(r.id, M), empty: '<p class="muted">Sin ventas en este rango.</p>' });
+}
+function detPorMedida(E, top = 10) {
+  const m = new Map();
+  for (const e of E) for (const l of e.lines) {
+    const k = medidaOf(l), r = m.get(k) || { k, pzs: 0, ras: 0, v: 0, u: 0 };
+    r.pzs += l.unidad === 'rastra' ? 0 : n(l.cant); r.ras += n(l.rastrasT); r.v += n(l.ingreso); r.u += n(l.util); m.set(k, r);
+  }
+  const rows = [...m.values()].sort((a, b) => b.ras - a.ras).slice(0, top);
+  return table([
+    { h: 'Medida', f: r => `<span class="cell-strong">${esc(r.k)}</span>` },
+    { h: 'Piezas', r: 1, f: r => num(r.pzs, 0) },
+    { h: 'Rastras', r: 1, f: r => num(r.ras) },
+    { h: 'Valor', r: 1, f: r => cop(r.v) },
+    { h: 'Utilidad', r: 1, f: r => `${signed(r.u)}<span class="sub">${r.ras ? cop(r.u / r.ras) + '/rastra' : ''}</span>` },
+  ], rows, { empty: '<p class="muted">Sin ventas en este rango.</p>' });
+}
+function detGastos(R, M = model()) {
+  const P = periodo(M, R);
+  const G = P.G.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const cats = [...agrupar(P.G, g => g.categoria || 'Otro')].map(([k, X]) => [k, sum(X, g => g.valor), X.length]).sort((a, b) => b[1] - a[1]);
+  const gTot = sum(P.G, g => g.valor);
+  return detCols(
+    detH('Por categoría') + detLedger([
+      ...cats.map(([k, v, c]) => [esc(k), cop(v), { sub: `${c} ${c === 1 ? 'registro' : 'registros'}` }]),
+      P.pauta ? ['Pauta (Meta)', cop(P.pauta), { sub: `${P.PD.length} ${P.PD.length === 1 ? 'día' : 'días'} con pauta prendida`, act: 'data-act="nav" data-v="pauta"' }] : null,
+      P.extras ? ['Nómina extra', cop(P.extras), { sub: `${P.NX.length} ${P.NX.length === 1 ? 'trabajo extra' : 'trabajos extra'}`, act: 'data-act="nav" data-v="nomina"' }] : null,
+      ['Total', cop(P.gastos), { total: true }],
+    ]),
+    P.NX.length ? detH('Trabajos extra de nómina') + detLedger(P.NX.map(x => [`${fmtDay(x.fecha)} · ${esc(M.trab.find(t => t.id === x.trabajadorId)?.nombre || 'Trabajador')}`, cop(x.valor), { sub: esc(x.detalle || x.nota || '') }])) : '',
+  ) + detH(`Gastos registrados (${G.length})`) + table([
+    { h: 'Fecha', f: g => `<span class="num">${fmtDate(g.fecha)}</span>` },
+    { h: 'Categoría', f: g => esc(g.categoria || 'Otro') },
+    { h: 'Descripción', f: g => `<span class="muted">${esc(g.descripcion || g.nota || '')}</span>` },
+    { h: 'Valor', r: 1, f: g => cop(g.valor) },
+  ], G, { act: g => editAttr('gastos', g.id), empty: '<p class="muted">No hay gastos registrados en este rango.</p>', foot: G.length > 1 ? ['Total', '', '', cop(gTot)] : null });
+}
+function detPinera(M = model()) {
+  const cargos = M.ledger.filter(m => m.tipo === 'cargo'), pagos = M.ledger.filter(m => m.tipo === 'pago');
+  const L = M.ledger.slice(-20).reverse();
+  return detP('Es lo que le debes a la pinera hoy: todas las compras de madera (y lo que la pinera pague por ti, como aserrío o flete) menos tus pagos, incluidos los que un cliente le hizo directo por ti. No depende del rango de fechas.')
+    + detCols(detLedger([
+      ['Compras a la pinera', cop(sum(cargos, m => m.valor)), { sub: `${cargos.length} compras · ${num(sum(cargos, m => m.rastras))} rastras` }],
+      ['− Pagos', cop(sum(pagos, m => m.valor)), { sub: `${pagos.length} pagos` }],
+      [M.pineraSaldo >= 0 ? 'Le debes hoy' : 'A tu favor hoy', cop(Math.abs(M.pineraSaldo)), { total: true }],
+    ]), '')
+    + detH('Últimos movimientos') + table([
+      { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+      { h: 'Movimiento', f: m => m.tipo === 'cargo' ? `<span class="cell-strong">Compra${m.ref.concepto && m.ref.concepto !== 'Madera' ? ` · ${esc(m.ref.concepto)}` : ''}</span><span class="sub">${m.rastras ? `${num(m.rastras)} rastras · ${cop(m.valor / m.rastras)}/rastra` : esc(m.ref.nota || '')}</span>` : `<span class="cell-strong">Pago</span><span class="sub">${esc([m.ref.medio, m.ref.nota].filter(Boolean).join(' · '))}</span>` },
+      { h: 'Compra', r: 1, f: m => m.tipo === 'cargo' ? cop(m.valor) : '' },
+      { h: 'Pago', r: 1, f: m => m.tipo === 'pago' ? `<span class="pos">${cop(m.valor)}</span>` : '' },
+      { h: 'Saldo', r: 1, f: m => `<b>${cop(m.saldo)}</b>` },
+    ], L, { act: m => m.col && m.ref && m.ref.id ? editAttr(m.col, m.ref.id) : '', empty: '<p class="muted">Sin movimientos con la pinera.</p>' })
+    + detIr('compras', 'Ver Compras y gastos');
+}
+function detInventario(M = model()) {
+  const inv = [...M.inv.values()].filter(r => r.stock > 0).sort((a, b) => b.stock * b.pv - a.stock * a.pv);
+  const p = n(M.cfg.pctSocio), est = estimadoInv(inv, p);
+  return detP(`Es lo que hay hoy en ${esc(M.cfg.punto)}: lo despachado menos lo devuelto menos lo vendido. El despacho va sin precio; el valor es un estimado, como si todo se vendiera a precio de venta al cliente final. El precio real se pone en cada venta.`)
+    + detCols(
+      detH('Si se vende todo a precio de venta') + detLedger([
+        ['Venta estimada', cop(est.venta), { sub: `${num(sum(inv, r => r.stock), 0)} piezas · ${num(sum(inv, r => r.stock * r.rastras))} rastras` }],
+        ['− Precio de sociedad', cop(est.base)],
+        ['= Utilidad de la sociedad', signed(est.util), { total: true }],
+        [`Parte de ${esc(M.cfg.socio)} (${100 - p}%)`, signed(est.parteSocio)],
+        [`Tu parte (${p}%)`, signed(est.miParte)],
+        ['+ Lo que ganas en el precio de sociedad sobre tu costo', signed(est.enPrecio)],
+        ['Tu utilidad estimada', signed(est.miParte + est.enPrecio), { total: true }],
+      ]),
+      detH('Lo que más vale en el punto') + table([
+        { h: 'Pieza', f: r => `<span class="cell-strong">${esc(r.nombre)}</span>` },
+        { h: 'Quedan', r: 1, f: r => num(r.stock, 0) },
+        { h: 'Precio venta', r: 1, f: r => r.pv ? cop(r.pv) : '<span class="muted">—</span>' },
+        { h: 'Valor', r: 1, f: r => r.pv ? cop(r.stock * r.pv) : '—' },
+      ], inv.slice(0, 12), { empty: '<p class="muted">No hay piezas en el punto.</p>' }),
+    ) + detIr('bb', `Ver ${M.cfg.punto}`);
+}
+function detCobrar(M = model()) {
+  const may = [...M.cartera.values()].filter(k => k.saldo > 0.5).sort((a, b) => b.saldo - a.saldo);
+  const fav = [...M.cartera.values()].filter(k => k.saldo < -0.5).sort((a, b) => a.saldo - b.saldo);
+  const fm = new Map();
+  const suma = (x, campo, v, ant = 0) => { const id = x.ref.clienteId || ''; const k = id || x.cliente; const r = fm.get(k) || { id, nombre: x.cliente, desp: 0, pend: 0, ant: 0, ref: x }; r[campo] += v; r.ant += ant; fm.set(k, r); };
+  for (const e of M.entries) if (e.canal === 'final' && e.calc.saldo > 0.5) suma(e, 'desp', e.calc.saldo);
+  for (const p of M.porEntregar) if (p.canal === 'final' && p.calc.saldo > 0.5) suma(p, 'pend', p.calc.saldo, Math.min(p.calc.pagado, p.calc.total));
+  const fin = [...fm.values()].sort((a, b) => (b.desp + b.pend) - (a.desp + a.pend));
+  const rub = Math.max(0, M.bbSaldo) + M.bbPorEntregar, tot = M.mayorSaldo + rub + M.finalSaldo;
+  return detP(`Es lo que te deben hoy, sin importar el rango de fechas. Mayoristas: sus pedidos (entregados y confirmados) menos sus abonos. ${esc(M.cfg.socio)}: lo que te liquida de las ventas de ${esc(M.cfg.punto)} menos lo que te ha pagado, más las ventas por entregar. Clientes finales: lo que falta de cada pedido después de anticipos y pagos.`)
+    + detCols(detLedger([
+      ['Mayoristas', cop(M.mayorSaldo), { act: 'data-act="nav" data-v="mayoristas"', sub: `${may.length} ${may.length === 1 ? 'cliente' : 'clientes'}` }],
+      [esc(M.cfg.socio), cop(rub), { act: 'data-act="nav" data-v="bb"', sub: `liquidaciones ${cop(Math.max(0, M.bbSaldo), true)} · por entregar ${cop(M.bbPorEntregar, true)}` }],
+      ['Clientes finales', cop(M.finalSaldo), { act: 'data-act="nav" data-v="final"', sub: `${fin.length} ${fin.length === 1 ? 'cliente' : 'clientes'}` }],
+      ['Total por cobrar', cop(tot), { total: true }],
+    ]), fav.length ? detH('Saldo a favor de mayoristas (les debes madera, no plata)') + detLedger(fav.map(k => [esc(k.cliente.nombre), cop(-k.saldo), { act: cuentaAttr(k.cliente.id, M), sub: 'Se descuenta de su próximo pedido' }])) : '')
+    + (may.length ? detH('Mayoristas') + table([
+      { h: 'Cliente', f: k => `<span class="cell-strong">${esc(k.cliente.nombre)}</span><span class="sub">${k.dias ? `${k.dias} días de crédito` : 'De contado'}</span>` },
+      { h: 'Debe', r: 1, f: k => `<b>${cop(k.saldo)}</b>` },
+      { h: 'Vencido', r: 1, f: k => k.vencido > 0.5 ? `<span class="neg">${cop(k.vencido)}</span><span class="sub">${k.mora} d de mora</span>` : '<span class="muted">—</span>' },
+      { h: 'Por entregar', r: 1, f: k => k.porEntregar > 0.5 ? cop(k.porEntregar) : '<span class="muted">—</span>' },
+      { h: 'Próximo vence', f: k => k.prox ? `<span class="num">${fmtDay(k.prox)}</span>` : '<span class="muted">—</span>' },
+    ], may, { act: k => cuentaAttr(k.cliente.id, M) }) : '')
+    + (fin.length ? detH('Clientes finales') + table([
+      { h: 'Cliente', f: r => `<span class="cell-strong">${esc(r.nombre)}</span>` },
+      { h: 'Despachado sin pagar', r: 1, f: r => r.desp > 0.5 ? cop(r.desp) : '<span class="muted">—</span>' },
+      { h: 'Pedido por entregar', r: 1, f: r => r.pend > 0.5 ? `${cop(r.pend)}${r.ant > 0.5 ? `<span class="sub">ya dio ${cop(r.ant, true)}</span>` : ''}` : '<span class="muted">—</span>' },
+      { h: 'Debe', r: 1, f: r => `<b>${cop(r.desp + r.pend)}</b>` },
+    ], fin, { act: r => cuentaAttr(r.id, M) || editAttr('ventas', r.ref.id) }) : '');
+}
+
+/* ---- Home ---- */
+DET['home:ventas'] = R => {
+  const M = model(), P = periodo(M, R), Q = S.range === 'todo' ? null : periodo(M, prevRange(R));
+  return detP(`Es lo que vendiste ${rangoTxt(R)}: los pedidos de mayoristas entregados, los de clientes finales despachados y, de ${esc(M.cfg.punto)}, lo que ${esc(M.cfg.socio)} te liquida (precio de sociedad más tu parte), no la venta completa del punto. Los pedidos por entregar todavía no cuentan: cuentan cuando salen.${Q ? ` En los ${diffDays(R.from, R.to) + 1} días anteriores fueron ${cop(Q.ingreso)} ${delta(P.ingreso, Q.ingreso)}.` : ''}`)
+    + detCols(detH('Por canal') + detPorCanal(P.E), detH('Los que más compraron') + detPorCliente(P.E, 8))
+    + detH(`Las ${P.E.length} ${P.E.length === 1 ? 'venta' : 'ventas'}`) + detVentas(P.E);
+};
+DET['home:utilidad'] = R => {
+  const M = model(), P = periodo(M, R), costo = sum(P.E, e => e.costo);
+  const cats = [...agrupar(P.G, g => g.categoria || 'Otro')].map(([k, X]) => [k, sum(X, g => g.valor), X.length]).sort((a, b) => b[1] - a[1]);
+  return detP(`Es lo que te queda ${rangoTxt(R)} después de pagar la madera y los gastos. El costo de cada venta es tu costo real: lo de la pinera más la mano de obra por rastra (aserrada y arriada), así que la nómina de los viajes ya va ahí. De ${esc(M.cfg.punto)} cuenta lo que ${esc(M.cfg.socio)} te liquida menos tu costo. Después se restan los gastos, la pauta y los trabajos extra.`)
+    + detCols(
+      detLedger([
+        ['Ventas', cop(P.ingreso), { sub: `${P.E.length} ${P.E.length === 1 ? 'venta' : 'ventas'}` }],
+        ['− Costo de la madera y fletes', cop(costo), { sub: 'Pinera + mano de obra por rastra' }],
+        ['= Utilidad bruta', signed(P.utilB), { total: true, sub: `margen ${pct(P.ingreso ? P.utilB / P.ingreso : NaN)}` }],
+        ...cats.map(([k, v, c]) => [`− ${esc(k)}`, cop(v), { sub: `${c} ${c === 1 ? 'gasto' : 'gastos'}` }]),
+        P.pauta ? ['− Pauta (Meta)', cop(P.pauta), { sub: `${P.PD.length} ${P.PD.length === 1 ? 'día' : 'días'} con pauta` }] : null,
+        P.extras ? ['− Nómina extra', cop(P.extras), { sub: `${P.NX.length} ${P.NX.length === 1 ? 'trabajo extra' : 'trabajos extra'}` }] : null,
+        ['= Utilidad neta', signed(P.utilN), { total: true, sub: `margen ${pct(P.ingreso ? P.utilN / P.ingreso : NaN)}` }],
+      ]),
+      detH('Utilidad bruta por canal') + detPorCanal(P.E),
+    )
+    + detH('Las ventas que más dejaron') + detVentas(P.E, { orden: 'util', max: 10 })
+    + detH('Utilidad por medida') + detPorMedida(P.E, 10);
+};
+DET['home:rastras'] = R => {
+  const M = model(), P = periodo(M, R);
+  return detP(`Son las rastras de lo que se vendió ${rangoTxt(R)}. Una rastra se calcula pieza por pieza: ancho × grueso (pulgadas) × largo (metros) ÷ 240. Lo que se despacha a ${esc(M.cfg.punto)} cuenta cuando se vende, no cuando sale.`)
+    + detCols(detH('Por canal') + detPorCanal(P.E), detH('Por cliente') + detPorCliente(P.E, 8))
+    + detH('Por medida') + detPorMedida(P.E, 15);
+};
+DET['home:porRastra'] = R => {
+  const M = model(), P = periodo(M, R), r = P.rastras, costo = sum(P.E, e => e.costo);
+  return detP(`Es la utilidad neta dividida por las rastras vendidas ${rangoTxt(R)}: cuánto te queda limpio por cada rastra.`)
+    + detCols(detLedger([
+      ['Precio promedio por rastra', porRastraTxt(P.ingreso, r), { sub: `${cop(P.ingreso)} ÷ ${num(r)} rastras` }],
+      ['− Costo promedio por rastra', porRastraTxt(costo, r), { sub: 'Pinera + mano de obra' }],
+      ['= Utilidad bruta por rastra', r ? signed(P.utilB / r) : '—', { total: true }],
+      ['− Gastos por rastra', porRastraTxt(P.gastos, r), { sub: `${cop(P.gastos)} de gastos, pauta y extras` }],
+      ['= Utilidad neta por rastra', r ? signed(P.utilN / r) : '—', { total: true }],
+    ]), detH('Por canal (antes de gastos)') + detPorCanal(P.E, { rastra: true }))
+    + detH('Por medida') + detPorMedida(P.E, 12);
+};
+DET['home:cobrar'] = () => detCobrar();
+DET['home:pinera'] = () => detPinera();
+DET['home:inv'] = () => detInventario();
+DET['home:gastos'] = R => detP(`Son los gastos ${rangoTxt(R)} que se restan de la utilidad: los que registras (flete, transporte, herramientas…), la pauta de Meta de los días que estuvo prendida y los trabajos extra de la nómina. La mano de obra por rastra no está aquí: ya va en el costo de la madera.`) + detGastos(R);
+
+/* ---- Mayoristas ---- */
+const mayE = R => { const M = model(), sel = S.filterCli && M.cli.has(S.filterCli) ? S.filterCli : ''; return M.entries.filter(e => e.canal === 'mayorista' && inR(e.fecha, R) && (!sel || e.ref.clienteId === sel)); };
+const selTxt = () => { const c = S.filterCli && model().cli.get(S.filterCli); return c ? ` de ${esc(c.nombre)}` : ''; };
+DET['may:ventas'] = R => { const E = mayE(R); return detP(`Son los pedidos de mayoristas${selTxt()} entregados ${rangoTxt(R)}, a precio de su lista (más el flete que se les cobra). Los pedidos por entregar ya cuentan como deuda, pero cuentan como venta cuando se entregan.`) + detH('Por cliente') + detPorCliente(E) + detH('Pedidos') + detVentas(E, { canal: false }); };
+DET['may:utilidad'] = R => {
+  const E = mayE(R), v = sum(E, e => e.ingreso), c = sum(E, e => e.costo);
+  return detP(`Es lo que te dejan los pedidos de mayoristas${selTxt()} ${rangoTxt(R)}: el valor de cada pedido menos tu costo real de la madera (pinera + mano de obra por rastra) y el flete que pagaste. Aquí no se restan los gastos generales; esos están en la utilidad neta de Home.`)
+    + detCols(detLedger([['Ventas', cop(v)], ['− Costo de la madera y fletes', cop(c)], ['= Utilidad', signed(v - c), { total: true, sub: `margen ${pct(v ? (v - c) / v : NaN)}` }]]), detH('Por cliente') + detPorCliente(E))
+    + detH('Pedidos que más dejaron') + detVentas(E, { canal: false, orden: 'util', max: 10 });
+};
+DET['may:rastras'] = R => { const E = mayE(R); return detP(`Rastras de los pedidos de mayoristas${selTxt()} entregados ${rangoTxt(R)}. Una rastra = ancho × grueso × largo ÷ 240.`) + detCols(detH('Por medida') + detPorMedida(E, 12), detH('Por cliente') + detPorCliente(E)); };
+DET['may:cartera'] = () => {
+  const M = model(), sel = S.filterCli && M.cli.has(S.filterCli) ? S.filterCli : '';
+  const K = [...M.cartera.values()].filter(k => !sel || k.cliente.id === sel).sort((a, b) => b.saldo - a.saldo);
+  return detP('Es lo que te deben hoy los mayoristas, sin importar el rango de fechas. Un pedido confirmado ya es deuda aunque no se haya entregado. Los abonos pagan primero los pedidos más viejos; un pedido está vencido cuando pasan sus días de crédito y no se ha pagado.')
+    + table([
+      { h: 'Cliente', f: k => `<span class="cell-strong">${esc(k.cliente.nombre)}</span><span class="sub">${k.dias ? `${k.dias} días de crédito` : 'De contado'} · toca para ver su historial</span>` },
+      { h: 'Saldo', r: 1, f: k => saldoTxt(k.saldo) },
+      { h: 'Vencido', r: 1, f: k => k.vencido > 0.5 ? `<span class="neg">${cop(k.vencido)}</span><span class="sub">${k.mora} d de mora</span>` : '<span class="muted">—</span>' },
+      { h: 'Por entregar', r: 1, f: k => k.porEntregar > 0.5 ? cop(k.porEntregar) : '<span class="muted">—</span>' },
+      { h: 'Próximo vence', f: k => k.prox ? `<span class="num">${fmtDay(k.prox)}</span>` : '<span class="muted">—</span>' },
+      { h: 'Última compra', f: k => k.ultima ? `<span class="num">${fmtDay(k.ultima)}</span>` : '<span class="muted">—</span>' },
+    ], K, { act: k => cuentaAttr(k.cliente.id, M), empty: '<p class="muted">No hay mayoristas.</p>' });
+};
+
+/* ---- Barro Blanco ---- */
+DET['bb:debe'] = () => {
+  const M = model(), liq = sum(M.bbEntries, e => e.ingreso), pag = sum(M.d.bbPagos, p => p.valor);
+  const PB = M.porEntregar.filter(p => p.canal === 'bb');
+  const P0 = M.d.bbPagos.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  return detP(`Es lo que ${esc(M.cfg.socio)} te debe hoy, sin importar el rango: de cada venta entregada te liquida el precio de sociedad más tu parte de la utilidad; a eso se le restan los pagos que te ha hecho. Las ventas por entregar también cuentan, por lo que te va a liquidar.`)
+    + detCols(detLedger([
+      ['Liquidaciones de ventas entregadas', cop(liq), { sub: `${M.bbEntries.length} ${M.bbEntries.length === 1 ? 'venta' : 'ventas'}` }],
+      ['− Pagos recibidos', cop(pag), { sub: `${M.d.bbPagos.length} ${M.d.bbPagos.length === 1 ? 'pago' : 'pagos'}` }],
+      ['= Saldo de ventas entregadas', M.bbSaldo < -0.5 ? `<span class="pos">A favor ${cop(-M.bbSaldo)}</span>` : cop(M.bbSaldo), { total: true }],
+      ['+ Ventas por entregar (lo que te liquidará)', cop(M.bbPorEntregar), { sub: `${PB.length} ${PB.length === 1 ? 'venta' : 'ventas'}` }],
+      [`${esc(M.cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar), { total: true }],
+    ]), detH('Pagos de ' + esc(M.cfg.socio)) + detLedger(P0.slice(0, 10).map(p => [`${fmtDay(p.fecha)} · ${esc(p.medio || 'Pago')}`, cop(p.valor), { sub: esc(p.nota || ''), act: editAttr('bbPagos', p.id) }])))
+    + (PB.length ? detH('Ventas por entregar') + table([
+      { h: 'Entrega', f: x => `<span class="num">${fmtDate(x.fecha)}</span>` },
+      { h: 'Cliente', f: x => `<span class="cell-strong">${esc(x.ref.cliente || '—')}</span><span class="sub">${detalle(x.lines)}</span>` },
+      { h: 'Venta', r: 1, f: x => cop(x.calc.venta) },
+      { h: 'Te liquida', r: 1, f: x => `<b>${cop(x.calc.debe)}</b>` },
+    ], PB, { act: x => editAttr('bbVentas', x.id) }) : '');
+};
+const bbR = R => model().bbEntries.filter(e => inR(e.fecha, R));
+const bbVentasTabla = E => table([
+  { h: 'Fecha', f: e => `<span class="num">${fmtDate(e.fecha)}</span>` },
+  { h: 'Cliente', f: e => `<span class="cell-strong">${esc(e.ref.cliente || '—')}</span><span class="sub">${detalle(e.lines)}</span>` },
+  { h: 'Venta', r: 1, f: e => cop(e.calc.venta) },
+  { h: 'Precio sociedad', r: 1, f: e => cop(e.calc.base) },
+  { h: 'Utilidad sociedad', r: 1, f: e => signed(e.calc.utilPunto) },
+  { h: 'Tu parte', r: 1, f: e => signed(e.calc.miParte) },
+  { h: 'Te liquida', r: 1, f: e => cop(e.calc.debe) },
+], E.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')), { act: e => editAttr('bbVentas', e.id), empty: '<p class="muted">No hay ventas reportadas en este rango.</p>', foot: E.length > 1 ? ['Total', '', cop(sum(E, e => e.calc.venta)), cop(sum(E, e => e.calc.base)), signed(sum(E, e => e.calc.utilPunto)), signed(sum(E, e => e.calc.miParte)), cop(sum(E, e => e.calc.debe))] : null });
+DET['bb:vendido'] = R => { const M = model(), E = bbR(R); return detP(`Es lo que se vendió en la sociedad ${rangoTxt(R)} (ventas entregadas), al precio real de cada venta. Del punto o con despacho directo.`) + detCols(detLedger([['Venta', cop(sum(E, e => e.calc.venta))], ['Rastras', num(sum(E, e => e.rastras))], ['Piezas', num(sum(E, e => e.piezas), 0)]]), detH('Por medida') + detPorMedida(E, 8)) + detH('Ventas') + bbVentasTabla(E) + detIr('bb', `Ver ${M.cfg.punto}`); };
+DET['bb:util'] = R => {
+  const M = model(), E = bbR(R), k = f => sum(E, e => f(e.calc)), p = n(M.cfg.pctSocio);
+  return detP(`Es lo que te deja la sociedad ${rangoTxt(R)}. De cada venta, la utilidad de la sociedad (venta menos precio de sociedad) se reparte ${p}/${100 - p}. Además ganas la diferencia entre el precio de sociedad y tu costo real de la madera.`)
+    + detCols(detLedger([
+      ['Venta', cop(k(c => c.venta))],
+      ['− Precio de sociedad', cop(k(c => c.base))],
+      ['= Utilidad de la sociedad', signed(k(c => c.utilPunto)), { total: true }],
+      [`Parte de ${esc(M.cfg.socio)} (${100 - p}%)`, signed(k(c => c.parteSocio))],
+      [`Tu parte (${p}%)`, signed(k(c => c.miParte))],
+      [`+ Precio de sociedad menos tu costo real (${cop(k(c => c.costo), true)})`, signed(k(c => c.base) - k(c => c.costo))],
+      ['= Tu utilidad', signed(k(c => c.miUtil)), { total: true }],
+    ]), '')
+    + detH('Ventas') + bbVentasTabla(E);
+};
+DET['bb:inv'] = () => detInventario();
+
+/* ---- Cliente final ---- */
+const finE = R => model().entries.filter(e => e.canal === 'final' && inR(e.fecha, R));
+DET['fin:pedidos'] = R => { const E = finE(R); return detP(`Son los pedidos de clientes finales despachados ${rangoTxt(R)}. Los pendientes (confirmados que no han salido) no cuentan hasta que salen.`) + detCols(detH('Por cliente') + detPorCliente(E), detH('Por medida') + detPorMedida(E, 8)) + detH('Pedidos') + detVentas(E, { canal: false }); };
+DET['fin:ventas'] = R => { const E = finE(R), v = sum(E, e => e.ingreso); return detP(`Es el valor de los pedidos de clientes finales despachados ${rangoTxt(R)}, con el flete que se les cobró. Ticket promedio: ${cop(E.length ? v / E.length : 0)} por pedido.`) + detH('Por cliente') + detPorCliente(E) + detH('Pedidos') + detVentas(E, { canal: false }); };
+DET['fin:util'] = R => { const E = finE(R), v = sum(E, e => e.ingreso), c = sum(E, e => e.costo); return detP(`Es lo que te dejan los pedidos de clientes finales ${rangoTxt(R)}: el valor menos tu costo real de la madera y el flete que pagaste. Los gastos generales y la pauta se restan en la utilidad neta de Home.`) + detCols(detLedger([['Ventas', cop(v)], ['− Costo de la madera y fletes', cop(c)], ['= Utilidad', signed(v - c), { total: true, sub: `margen ${pct(v ? (v - c) / v : NaN)}` }]]), detH('Por cliente') + detPorCliente(E)) + detH('Pedidos que más dejaron') + detVentas(E, { canal: false, orden: 'util', max: 10 }); };
+DET['fin:cobrar'] = () => detCobrar();
+
+/* ---- Compras y gastos ---- */
+const comprasR = R => model().ledger.filter(m => inR(m.fecha, R));
+DET['com:pinera'] = () => detPinera();
+DET['com:compra'] = R => {
+  const C = comprasR(R).filter(m => m.tipo === 'cargo').reverse();
+  return detP(`Son las compras a la pinera ${rangoTxt(R)}. El promedio por rastra solo cuenta las compras de madera con rastras.`) + table([
+    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+    { h: 'Concepto', f: m => `<span class="cell-strong">${esc(m.ref.concepto || 'Madera')}</span><span class="sub">${esc(m.ref.remision ? 'Remisión ' + m.ref.remision : m.ref.nota || '')}</span>` },
+    { h: 'Rastras', r: 1, f: m => m.rastras ? num(m.rastras) : '—' },
+    { h: 'Por rastra', r: 1, f: m => m.rastras ? cop(m.valor / m.rastras) : '—' },
+    { h: 'Valor', r: 1, f: m => cop(m.valor) },
+  ], C, { act: m => m.col && m.ref.id ? editAttr(m.col, m.ref.id) : '', empty: '<p class="muted">No hay compras en este rango.</p>', foot: C.length > 1 ? ['Total', '', num(sum(C, m => m.rastras)), '', cop(sum(C, m => m.valor))] : null });
+};
+DET['com:pagos'] = R => {
+  const Pg = comprasR(R).filter(m => m.tipo === 'pago').reverse();
+  return detP(`Son los pagos a la pinera ${rangoTxt(R)}, incluidos los que un cliente le hizo directo por ti.`) + table([
+    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+    { h: 'Medio', f: m => `${esc(m.ref.medio || '—')}<span class="sub">${esc(m.ref.nota || '')}</span>` },
+    { h: 'Valor', r: 1, f: m => cop(m.valor) },
+  ], Pg, { act: m => m.col && m.ref.id ? editAttr(m.col, m.ref.id) : '', empty: '<p class="muted">No hay pagos en este rango.</p>', foot: Pg.length > 1 ? ['Total', '', cop(sum(Pg, m => m.valor))] : null });
+};
+DET['com:gastos'] = R => DET['home:gastos'](R);
+
+/* ---- Nómina ---- */
+DET['nom:debes'] = () => {
+  const M = model();
+  return detP('Es lo que le debes hoy a cada trabajador: cada viaje suma sus rastras por la tarifa (aserrada o arriada), los trabajos extra también suman y cada abono resta. Si le pagaste de más, queda como adelanto. Toca un trabajador para ver todo su historial.')
+    + table([
+      { h: 'Trabajador', f: t => `<span class="cell-strong">${esc(t.nombre)}</span><span class="sub">${esc(t.concepto === 'aserrada' ? 'Aserrada' : t.concepto === 'arriada' ? 'Arriada' : t.concepto || '')}</span>` },
+      { h: 'Por viajes', r: 1, f: t => cop(sum(M.nominaMovs.filter(m => m.trabajadorId === t.id && m.tipo === 'devengo'), m => m.valor)) },
+      { h: 'Extras', r: 1, f: t => cop(sum(M.nominaMovs.filter(m => m.trabajadorId === t.id && m.tipo === 'cargo'), m => m.valor)) },
+      { h: 'Abonos', r: 1, f: t => `<span class="pos">${cop(sum(M.nominaMovs.filter(m => m.trabajadorId === t.id && m.tipo === 'pago'), m => m.valor))}</span>` },
+      { h: 'Saldo', r: 1, f: t => { const v = M.nominaSaldo.get(t.id) || 0; return v < -0.5 ? `<span class="pos">Adelanto ${cop(-v)}</span>` : `<b>${cop(v)}</b>`; } },
+    ], M.trab, { act: t => `data-act="trab" data-id="${esc(t.id)}"` });
+};
+const viajesTabla = (X, M = model()) => table([
+  { h: 'Fecha', f: x => `<span class="num">${fmtDate(x.fecha)}</span>` },
+  { h: 'Viaje', f: x => `<span class="cell-strong">${esc(x.destino || '')}</span><span class="sub">${esc(x.remision ? 'Remisión ' + x.remision : '')}</span>` },
+  { h: 'Rastras', r: 1, f: x => num(x.rastras) },
+  ...M.trab.map(t => ({ h: esc(t.nombre), r: 1, f: x => cop(x.rastras * tarifaTrab(t, x.ref, M.cfg)) })),
+], X.slice().sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')), { empty: '<p class="muted">No hay viajes en este rango.</p>', foot: X.length > 1 ? ['Total', '', num(sum(X, x => x.rastras)), ...M.trab.map(t => cop(sum(X, x => x.rastras * tarifaTrab(t, x.ref, M.cfg))))] : null });
+DET['nom:semana'] = () => { const M = model(), sab = sabadoDe(M.hoy), dom = addDays(sab, -6), X = M.despachos.filter(x => x.fecha >= dom && x.fecha <= sab); return detP(`Los viajes de esta semana (del ${fmtDay(dom)} al sábado ${fmtDay(sab)}) y lo que suma cada uno a cada trabajador.`) + viajesTabla(X, M); };
+DET['nom:periodo'] = R => { const M = model(), X = M.despachos.filter(x => inR(x.fecha, R)); return detP(`Es lo que se ganaron los trabajadores ${rangoTxt(R)}: rastras de cada viaje por la tarifa de cada uno (más los trabajos extra). Ya está dentro del costo de la madera, por eso no se resta otra vez de la utilidad.`) + viajesTabla(X, M); };
+DET['nom:pagado'] = R => {
+  const M = model(), Pg = M.nominaMovs.filter(m => m.tipo === 'pago' && inR(m.fecha, R)).slice().reverse();
+  return detP(`Los abonos a los trabajadores ${rangoTxt(R)}.`) + table([
+    { h: 'Fecha', f: m => `<span class="num">${fmtDate(m.fecha)}</span>` },
+    { h: 'Trabajador', f: m => `<span class="cell-strong">${esc(M.trab.find(t => t.id === m.trabajadorId)?.nombre || '—')}</span><span class="sub">${esc([m.medio, m.nota, m.detalle].filter(Boolean).join(' · '))}</span>` },
+    { h: 'Valor', r: 1, f: m => cop(m.valor) },
+  ], Pg, { act: m => m.col && m.id ? editAttr(m.col, m.id) : '', empty: '<p class="muted">No hay abonos en este rango.</p>', foot: Pg.length > 1 ? ['Total', '', cop(sum(Pg, m => m.valor))] : null });
+};
+
+/* ---- Remisiones ---- */
+const remR = R => model().d.remisiones.filter(r => inR(r.fecha, R)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+const remTabla = E => table([
+  { h: 'Fecha', f: r => `<span class="num">${fmtDate(r.fecha)}</span>` },
+  { h: 'Remisión', f: r => `<span class="cell-strong">${esc(r.numero || 'Sin número')}</span>` },
+  { h: 'Para quién', f: r => (r.destinos || []).map(x => `${esc(x.nombre)} <span class="muted">(${num(x.piezas, 0)} pzs · ${cop(x.valor, true)}${x.estimado ? ' estimado' : ''})</span>`).join('<br>') },
+  { h: 'Rastras', r: 1, f: r => num(r.rastras) },
+  { h: 'Valor', r: 1, f: r => cop(r.valor) },
+], E, { act: r => editAttr('remisiones', r.id), empty: '<p class="muted">No hay remisiones en este rango.</p>', foot: E.length > 1 ? ['Total', '', '', num(sum(E, r => r.rastras)), cop(sum(E, r => r.valor))] : null });
+const remPorDestino = E => {
+  const g = new Map();
+  for (const r of E) for (const x of r.destinos || []) { const k = x.tipo === 'bb' ? 'Barro Blanco (estimado)' : x.nombre; const o = g.get(k) || { k, n: 0, pzs: 0, ras: 0, v: 0 }; o.n++; o.pzs += n(x.piezas); o.ras += n(x.rastras); o.v += n(x.valor); g.set(k, o); }
+  return detLedger([...g.values()].sort((a, b) => b.v - a.v).map(o => [esc(o.k), cop(o.v), { sub: `${o.n} ${o.n === 1 ? 'viaje' : 'viajes'} · ${num(o.pzs, 0)} pzs · ${num(o.ras)} rastras` }]));
+};
+DET['rem:n'] = R => { const E = remR(R); return detP(`Las remisiones de cargue ${rangoTxt(R)}. Toca una para ver sus fotos, el despiece y a quién se le despachó.`) + remTabla(E); };
+DET['rem:ras'] = R => { const E = remR(R); return detP(`Las rastras que salieron en las remisiones ${rangoTxt(R)}, por destino.`) + remPorDestino(E) + detH('Remisiones') + remTabla(E); };
+DET['rem:valor'] = R => { const E = remR(R); return detP(`El valor de lo despachado ${rangoTxt(R)}: las ventas a su precio y lo que va a Barro Blanco como estimado a precio de venta (ese no es venta todavía).`) + remPorDestino(E) + detH('Remisiones') + remTabla(E); };
+DET['rem:nom'] = R => { const M = model(), X = M.despachos.filter(x => inR(x.fecha, R) && x.col === 'remisiones'); return detP(`Lo que suma a la nómina cada viaje ${rangoTxt(R)}: rastras por la tarifa de cada trabajador.`) + viajesTabla(X.length ? X : M.despachos.filter(x => inR(x.fecha, R)), M) + detIr('nomina', 'Ver Nómina'); };
+
+// Pinta el desplegable abierto debajo de su fila de tarjetas.
+function pintarDetalle(R) {
+  if (!S.det) return;
+  const k = $(`#view .kpi[data-det="${S.det}"]`);
+  if (!k || !DET[S.det]) { S.det = ''; return; }
+  let html;
+  try { html = DET[S.det](R, model()); } catch (e) { console.error(e); html = '<p class="muted">No se pudo armar este detalle.</p>'; }
+  const t = k.querySelector('.kpi-l')?.textContent || 'Detalle';
+  k.closest('.kpis').insertAdjacentHTML('afterend', `<section class="kpi-det" id="kpi-det" aria-label="Detalle de ${esc(t)}"><header><div><div class="eyebrow">De dónde sale</div><h3>${esc(t)} · <span class="kpi-det-v">${k.querySelector('.kpi-v')?.innerHTML || ''}</span></h3></div><button type="button" class="icon-btn" data-act="det" data-det="${esc(S.det)}" aria-label="Cerrar el detalle">${icon('x')}</button></header>${html}</section>`);
+}
+
+/* ---- Ficha del cliente: sus datos, lo que ha comprado y cómo compra ---- */
+function fichaCliente(cid, M = model()) {
+  const c = M.cli.get(cid); if (!c) return '';
+  const fin = c.tipo === 'final';
+  const E = M.entries.filter(e => e.ref.clienteId === cid && e.canal === (fin ? 'final' : 'mayorista'));
+  const PE = M.porEntregar.filter(p => p.ref.clienteId === cid);
+  const fechas = E.map(e => e.fecha).filter(isDate).sort();
+  const gaps = fechas.slice(1).map((f, i) => diffDays(fechas[i], f));
+  const cada = gaps.length ? Math.round(sum(gaps, x => x) / gaps.length) : 0;
+  const v = sum(E, e => e.ingreso), u = sum(E, e => e.util), ras = sum(E, e => e.rastras);
+  const lista = M.listas.get(fin ? M.cfg.listaFinal : c.listaId);
+  const k = M.cartera.get(cid);
+  const med = new Map();
+  for (const e of E) for (const l of e.lines) if (l.unidad !== 'rastra') { const m = `${medidaOf(l)} × ${num(l.largo, 2)} m`; med.set(m, (med.get(m) || 0) + n(l.cant)); }
+  const top = [...med].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const datos = [c.empresa && c.empresa !== c.nombre ? esc(c.empresa) : '', c.oficio && c.oficio !== 'Persona' ? esc(c.oficio) : '', esc([c.municipio, c.direccion].filter(Boolean).join(' · ')),
+    fin ? 'Cliente final' : `Mayorista · ${k && k.dias ? `${k.dias} días de crédito` : 'de contado'}`, `Lista: ${esc(lista ? lista.nombre : 'sin lista')}`].filter(Boolean);
+  return `<div class="ficha">
+    <div class="ficha-d">${datos.map(d => `<span>${d}</span>`).join('')}${c.celular ? `<span class="num">${esc(c.celular)}</span>${waLink(c.celular)}` : ''}</div>
+    <div class="inv-res ficha-k">
+      <div><span>Ha comprado</span><b>${cop(v, true)}</b><small>${E.length} ${E.length === 1 ? 'pedido' : 'pedidos'}${PE.length ? ` + ${PE.length} por entregar` : ''}</small></div>
+      <div><span>Te ha dejado</span><b class="${u < 0 ? 'neg' : ''}">${cop(u, true)}</b><small>margen ${pct(v ? u / v : NaN)}</small></div>
+      <div><span>Rastras</span><b>${num(ras)}</b><small>${ras ? `${cop(u / ras)} de utilidad por rastra` : '—'}</small></div>
+      <div><span>Pedido promedio</span><b>${cop(E.length ? v / E.length : 0, true)}</b><small>${num(E.length ? ras / E.length : 0)} rastras por pedido</small></div>
+      <div><span>Primera compra</span><b>${fechas[0] ? fmtDay(fechas[0]) : '—'}</b><small>${fechas[0] ? fechas[0].slice(0, 4) : ''}</small></div>
+      <div><span>Última compra</span><b>${fechas.length ? fmtDay(fechas[fechas.length - 1]) : '—'}</b><small>${cada ? `compra cada ${cada} días en promedio` : fechas.length ? `hace ${diffDays(fechas[fechas.length - 1], M.hoy)} días` : ''}</small></div>
+    </div>
+    ${top.length ? `<p class="ficha-top"><b>Lo que más compra:</b> ${top.map(([m, q]) => `${esc(m)} <span class="muted">(${num(q, 0)} pzs)</span>`).join(' · ')}</p>` : ''}
+    ${c.nota ? `<p class="muted" style="font-size:12.5px;margin:0">${esc(c.nota)}</p>` : ''}
+  </div>`;
+}
 
 /* ---------- Estado de cuenta de un cliente: compras y abonos con el saldo después de cada uno ---------- */
 function cuentaMovs(cid, M = model()) {
@@ -1196,10 +1610,10 @@ VIEW_FN.bb = R => {
   const invPzs = sum(inv, r => Math.max(0, r.stock)), invVal = sum(inv, r => Math.max(0, r.stock) * r.pv), invCost = sum(inv, r => Math.max(0, r.stock) * r.costo);
 
   const kp = `<div class="kpis">
-    ${kpi(`${esc(cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar), [M.bbSaldo < -0.5 ? `Tiene ${cop(-M.bbSaldo)} a favor` : 'Liquidaciones menos pagos recibidos', M.bbPorEntregar > 0.5 ? `incluye ${cop(M.bbPorEntregar, true)} de ventas por entregar` : ''].filter(Boolean).join(' · '), { dot: 'var(--s2)' })}
-    ${kpi('Vendido en el punto', cop(venta), `${num(ras)} rastras · ${E.length} reportes`)}
-    ${kpi('Tu utilidad', signed(miU), `${cop(mi, true)} de tu ${p}% + margen sobre tu costo`)}
-    ${kpi('Inventario en el punto', `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal, true)} a precio de venta · costo ${cop(invCost, true)}`)}
+    ${kpi(`${esc(cfg.socio)} te debe hoy`, cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar), [M.bbSaldo < -0.5 ? `Tiene ${cop(-M.bbSaldo)} a favor` : 'Liquidaciones menos pagos recibidos', M.bbPorEntregar > 0.5 ? `incluye ${cop(M.bbPorEntregar, true)} de ventas por entregar` : ''].filter(Boolean).join(' · '), { dot: 'var(--s2)', det: 'bb:debe' })}
+    ${kpi('Vendido en el punto', cop(venta), `${num(ras)} rastras · ${E.length} reportes`, { det: 'bb:vendido' })}
+    ${kpi('Tu utilidad', signed(miU), `${cop(mi, true)} de tu ${p}% + margen sobre tu costo`, { det: 'bb:util' })}
+    ${kpi('Inventario en el punto', `${num(invPzs, 0)} pzs`, `Estimado ${cop(invVal, true)} a precio de venta · costo ${cop(invCost, true)}`, { det: 'bb:inv' })}
   </div>`;
 
   const invT = table([
@@ -1323,10 +1737,10 @@ VIEW_FN.final = R => {
   const E = all.filter(e => inR(e.fecha, R));
   const ing = sum(E, e => e.ingreso), ut = sum(E, e => e.util);
   const kp = `<div class="kpis">
-    ${kpi('Pedidos despachados', num(E.length, 0), `${num(sum(E, e => e.piezas), 0)} piezas · ${num(sum(E, e => e.rastras))} rastras`, { dot: 'var(--s3)' })}
-    ${kpi('Ventas', cop(ing), `Ticket promedio ${cop(E.length ? ing / E.length : 0)}`)}
-    ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`)}
-    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${M.finalPorEntregar > 0.5 ? `${cop(M.finalPorEntregar, true)} de pedidos por entregar` : `${(k => `${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'} con saldo`)(all.filter(e => e.calc.saldo > 0.5).length)}`}${M.anticiposFinal > 0.5 ? ` · ya restados ${cop(M.anticiposFinal, true)} de anticipos` : ''}`)}
+    ${kpi('Pedidos despachados', num(E.length, 0), `${num(sum(E, e => e.piezas), 0)} piezas · ${num(sum(E, e => e.rastras))} rastras`, { dot: 'var(--s3)', det: 'fin:pedidos' })}
+    ${kpi('Ventas', cop(ing), `Ticket promedio ${cop(E.length ? ing / E.length : 0)}`, { det: 'fin:ventas' })}
+    ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`, { det: 'fin:util' })}
+    ${kpi('Por cobrar hoy', cop(M.finalSaldo), `${M.finalPorEntregar > 0.5 ? `${cop(M.finalPorEntregar, true)} de pedidos por entregar` : `${(k => `${k} ${k === 1 ? 'pedido despachado' : 'pedidos despachados'} con saldo`)(all.filter(e => e.calc.saldo > 0.5).length)}`}${M.anticiposFinal > 0.5 ? ` · ya restados ${cop(M.anticiposFinal, true)} de anticipos` : ''}`, { det: 'fin:cobrar' })}
   </div>`;
 
   const pc = pend.length ? card('Por entregar', table([
@@ -1477,10 +1891,10 @@ VIEW_FN.compras = R => {
   const gTot = sum(G, g => g.valor);
   const pautaR = sum(pautaDias(M.cfg, R.from, R.to, M.hoy), x => x.valor), extraR = sum(nominaExtras(M, R), x => x.valor);
   const kp = `<div class="kpis">
-    ${kpi('Saldo con la pinera hoy', cop(Math.abs(M.pineraSaldo)), M.pineraSaldo >= 0 ? 'Le debes a la pinera' : 'A tu favor (pagaste de más)', { cls: M.pineraSaldo > 0 ? '' : 'pos', dot: 'var(--s2)' })}
-    ${kpi('Compra de madera', cop(sum(compras, m => m.valor)), `${num(sum(compras, m => m.rastras))} rastras · promedio ${cop(prom)}/rastra`)}
-    ${kpi('Pagos a la pinera', cop(sum(pagos, m => m.valor)), `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'} en el período`)}
-    ${kpi('Gastos', cop(gTot + pautaR + extraR), pautaR || extraR ? `${cop(gTot, true)} registrados${pautaR ? ` + ${cop(pautaR, true)} de pauta` : ''}${extraR ? ` + ${cop(extraR, true)} de nómina extra` : ''}` : `${G.length} ${G.length === 1 ? 'registro' : 'registros'} en el período`)}
+    ${kpi('Saldo con la pinera hoy', cop(Math.abs(M.pineraSaldo)), M.pineraSaldo >= 0 ? 'Le debes a la pinera' : 'A tu favor (pagaste de más)', { cls: M.pineraSaldo > 0 ? '' : 'pos', dot: 'var(--s2)', det: 'com:pinera' })}
+    ${kpi('Compra de madera', cop(sum(compras, m => m.valor)), `${num(sum(compras, m => m.rastras))} rastras · promedio ${cop(prom)}/rastra`, { det: 'com:compra' })}
+    ${kpi('Pagos a la pinera', cop(sum(pagos, m => m.valor)), `${pagos.length} ${pagos.length === 1 ? 'pago' : 'pagos'} en el período`, { det: 'com:pagos' })}
+    ${kpi('Gastos', cop(gTot + pautaR + extraR), pautaR || extraR ? `${cop(gTot, true)} registrados${pautaR ? ` + ${cop(pautaR, true)} de pauta` : ''}${extraR ? ` + ${cop(extraR, true)} de nómina extra` : ''}` : `${G.length} ${G.length === 1 ? 'registro' : 'registros'} en el período`, { det: 'com:gastos' })}
   </div>`;
   // saldo con la pinera al final de cada tramo del rango
   const B = bucketize(R);
@@ -1650,10 +2064,10 @@ VIEW_FN.nomina = R => {
   const dev = enR.filter(m => m.tipo !== 'pago'), pag = enR.filter(m => m.tipo === 'pago');
   const despR = M.despachos.filter(x => inR(x.fecha, R)), despS = M.despachos.filter(x => x.fecha >= dom && x.fecha <= sab);
   const kp = `<div class="kpis">
-    ${kpi('Debes hoy', cop(debe), M.trab.map(t => { const v = M.nominaSaldo.get(t.id) || 0; return `${esc(t.nombre)} ${v < -0.5 ? `adelanto ${cop(-v, true)}` : cop(v, true)}`; }).join(' · '), { dot: 'var(--s2)' })}
-    ${kpi(`Semana al sábado ${fmtDay(sab)}`, `${num(sum(despS, x => x.rastras))} rastras`, `${despS.length} ${despS.length === 1 ? 'remisión cargada' : 'remisiones cargadas'} desde el ${fmtDay(dom)}`)}
-    ${kpi('Nómina del período', cop(sum(dev, m => m.valor)), `${num(sum(despR, x => x.rastras))} rastras despachadas · ya incluida en el costo`)}
-    ${kpi('Pagado en el período', cop(sum(pag, m => m.valor)), `${pag.length} ${pag.length === 1 ? 'pago' : 'pagos'}`)}
+    ${kpi('Debes hoy', cop(debe), M.trab.map(t => { const v = M.nominaSaldo.get(t.id) || 0; return `${esc(t.nombre)} ${v < -0.5 ? `adelanto ${cop(-v, true)}` : cop(v, true)}`; }).join(' · '), { dot: 'var(--s2)', det: 'nom:debes' })}
+    ${kpi(`Semana al sábado ${fmtDay(sab)}`, `${num(sum(despS, x => x.rastras))} rastras`, `${despS.length} ${despS.length === 1 ? 'remisión cargada' : 'remisiones cargadas'} desde el ${fmtDay(dom)}`, { det: 'nom:semana' })}
+    ${kpi('Nómina del período', cop(sum(dev, m => m.valor)), `${num(sum(despR, x => x.rastras))} rastras despachadas · ya incluida en el costo`, { det: 'nom:periodo' })}
+    ${kpi('Pagado en el período', cop(sum(pag, m => m.valor)), `${pag.length} ${pag.length === 1 ? 'pago' : 'pagos'}`, { det: 'nom:pagado' })}
   </div>`;
 
   const cards = M.trab.map(t => {
@@ -1716,10 +2130,10 @@ VIEW_FN.remisiones = R => {
   const E = all.filter(r => inR(r.fecha, R));
   const nom = rid => sum(M.nominaMovs.filter(m => m.col === 'remisiones' && m.id === rid && m.tipo === 'devengo'), m => m.valor);
   const kp = `<div class="kpis">
-    ${kpi('Remisiones', num(E.length, 0), `${num(sum(E, r => r.piezas), 0)} piezas cargadas`, { dot: 'var(--s2)' })}
-    ${kpi('Rastras despachadas', num(sum(E, r => r.rastras)), 'En el período')}
-    ${kpi('Valor despachado', cop(sum(E, r => r.valor)), 'Ventas a su precio; Barro Blanco estimado a precio de venta')}
-    ${kpi('Nómina de los viajes', cop(sum(E, r => nom(r.id))), M.trab.map(t => esc(t.nombre)).join(' y ') || 'Configura la nómina', { go: 'nomina' })}
+    ${kpi('Remisiones', num(E.length, 0), `${num(sum(E, r => r.piezas), 0)} piezas cargadas`, { dot: 'var(--s2)', det: 'rem:n' })}
+    ${kpi('Rastras despachadas', num(sum(E, r => r.rastras)), 'En el período', { det: 'rem:ras' })}
+    ${kpi('Valor despachado', cop(sum(E, r => r.valor)), 'Ventas a su precio; Barro Blanco estimado a precio de venta', { det: 'rem:valor' })}
+    ${kpi('Nómina de los viajes', cop(sum(E, r => nom(r.id))), M.trab.map(t => esc(t.nombre)).join(' y ') || 'Configura la nómina', { det: 'rem:nom' })}
   </div>`;
   const t = table([
     { h: 'Fecha', f: r => `<span class="num">${fmtDate(r.fecha)}</span>` },
@@ -3284,7 +3698,7 @@ FORMS['cuenta'] = {
   init: () => ({}),
   body: r => {
     const k = cuentaMovs(r.clienteId); if (!k) return '<p>No encontré este cliente.</p>';
-    return `${cuentaResumen(k)}
+    return `${fichaCliente(r.clienteId)}${cuentaResumen(k)}
       <p class="muted" style="font-size:12.5px;margin:0">Cada venta con la mercancía que se le mandó, cada ${k.c.tipo === 'final' ? 'pago o anticipo' : 'abono'} y cómo quedó el saldo después, del más viejo al más nuevo. Toca una fila para abrirla.${k.c.tipo === 'final' ? ` ${btn('Editar datos del cliente', `data-act="edit" data-col="clientes" data-id="${esc(r.clienteId)}"`, 'ghost sm')}` : ''}</p>
       ${cuentaTabla(r.clienteId)}
       <div class="pills">${btn(`${icon('plus')}${k.c.tipo === 'final' ? 'Anticipo' : 'Abono'}`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'anticipo' : 'abono'}" data-cli="${esc(r.clienteId)}"`, 'sm')}${btn(`${icon('plus')}Pedido`, `data-act="form" data-form="${k.c.tipo === 'final' ? 'venta-final' : 'venta-mayorista'}" data-cli="${esc(r.clienteId)}"`, 'sm')}</div>`;
@@ -4087,7 +4501,8 @@ document.addEventListener('click', e => {
   const a = t.dataset.act;
   switch (a) {
     case 'nav': if (t.dataset.v === 'equipo') { toggleMenu(false); if (window.AHOficina) window.AHOficina.abrir(t); break; }
-      S.view = t.dataset.v; pref.set('view', S.view); render(); window.scrollTo(0, 0); break;
+      S.view = t.dataset.v; S.det = ''; pref.set('view', S.view); render(); window.scrollTo(0, 0); break;
+    case 'det': S.det = S.det === t.dataset.det ? '' : t.dataset.det; render(); if (S.det) requestAnimationFrame(() => { const d = $('#kpi-det'); if (d) d.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }); break;
     case 'range': S.range = t.dataset.r; pref.set('range', S.range); render(); break;
     case 'menu': toggleMenu(); break;
     case 'form': toggleMenu(false); cerrarPop(); openForm(t.dataset.form, null, prefillDe(t.dataset, t.dataset.form)); break;
@@ -4156,7 +4571,7 @@ document.addEventListener('click', e => {
   }
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { if (!$('#lightbox').hidden) cerrarFoto(); else if ($('#pop')) cerrarPop(); else if (!$('#drawer').hidden) closeForm(); else toggleMenu(false); }
+  if (e.key === 'Escape') { if (!$('#lightbox').hidden) cerrarFoto(); else if ($('#pop')) cerrarPop(); else if (!$('#drawer').hidden) closeForm(); else if (S.det) { S.det = ''; render(); } else toggleMenu(false); }
   if (e.key === 'Enter' && e.target.matches && e.target.matches('tr[data-act], [role="button"][data-act]')) e.target.click();
 });
 document.addEventListener('input', e => {

@@ -307,6 +307,34 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .kpi-v.sm { font-size: 21px; }
 .kpi-s { font-size: 12px; color: var(--fg-2); display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .kpis.soft .kpi { background: var(--surface-2); }
+/* Desplegables: cada tarjeta se abre debajo y explica su número */
+.kpi.det { cursor: pointer; }
+.kpi.det .kpi-l::after { content: ""; margin-left: auto; width: 6px; height: 6px; border-right: 1.6px solid currentColor; border-bottom: 1.6px solid currentColor; transform: translateY(-2px) rotate(45deg); opacity: .5; transition: transform .2s, opacity .2s, color .2s; flex: none; }
+.kpi.det:hover { background: var(--accent-soft); }
+.kpi.det:hover .kpi-l::after { opacity: 1; color: var(--brand); }
+.kpi.det.open { background: var(--accent-soft); }
+.kpi.det.open::before { transform: scaleX(1); }
+.kpi.det.open .kpi-l::after { transform: translateY(1px) rotate(225deg); opacity: 1; color: var(--brand); }
+.kpi-det { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--brand); border-radius: var(--r); padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: var(--shadow); animation: det-in .24s cubic-bezier(.2, .7, .2, 1); min-width: 0; }
+.kpi-det > header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.kpi-det > header h3 { font-size: 17px; font-weight: 600; margin-top: 3px; font-variation-settings: "wdth" 106; }
+.kpi-det-v { color: var(--accent-tx); }
+.kpi-det .ldg-h { margin-top: 6px; }
+.det-exp { font-size: 13px; line-height: 1.55; color: var(--fg-2); max-width: 92ch; }
+.det-cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 30px; align-items: start; }
+.det-cols > div { min-width: 0; }
+.det-acts { display: flex; gap: 8px; flex-wrap: wrap; }
+@keyframes det-in { from { opacity: 0; transform: translateY(-6px); } }
+@media (max-width: 760px) { .det-cols { grid-template-columns: minmax(0, 1fr); } }
+@media (prefers-reduced-motion: reduce) { .kpi-det { animation: none; } }
+/* Ficha del cliente */
+.ficha { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
+.ficha-d { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 13px; color: var(--fg-2); }
+.ficha-d > span + span::before { content: "·"; margin-right: 14px; color: var(--line-strong); }
+.inv-res.ficha-k { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: 0; }
+.inv-res.ficha-k small { font-size: 11.5px; color: var(--muted); }
+.ficha-top { font-size: 12.5px; color: var(--fg-2); margin: 0; }
+@media (max-width: 520px) { .inv-res.ficha-k { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px 2px 6px; border-radius: 99px; font: 500 11px/1.6 var(--f-mono); white-space: nowrap; background: var(--sunken); color: var(--fg-2); }
 .chip svg { width: 11px; height: 11px; flex: none; }
