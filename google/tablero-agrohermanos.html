@@ -313,6 +313,7 @@ input.sr-only:focus-visible + * , .drop:focus-within { outline: 2px solid var(--
 .kpi-l i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .kpi-v { font-size: 27px; font-weight: 600; letter-spacing: -.015em; font-variation-settings: "wdth" 108; line-height: 1.1; overflow-wrap: anywhere; }
 .kpi-v.sm { font-size: 21px; }
+.kpi-v .kpi-pc { font-size: .6em; font-weight: 600; color: var(--muted); margin-left: 8px; letter-spacing: 0; white-space: nowrap; }
 .kpi-s { font-size: 12px; color: var(--fg-2); display: flex; flex-wrap: wrap; gap: 4px 10px; }
 .kpis.soft .kpi { background: var(--surface-2); }
 /* Desplegables: cada tarjeta se abre debajo y explica su número */
@@ -1747,7 +1748,7 @@ VIEW_FN.resumen = R => {
     ${kpi('Ventas', cop(P.ingreso), `${P.E.length} ${P.E.length === 1 ? 'venta' : 'ventas'}${Q ? ' ' + delta(P.ingreso, Q.ingreso) : ''}`, { det: 'home:ventas' })}
     ${kpi('Utilidad neta', signed(P.utilN), `Margen ${pct(margen)}${Q ? ' ' + delta(P.utilN, Q.utilN) : ''}`, { det: 'home:utilidad' })}
     ${kpi('Rastras vendidas', num(P.rastras, 2), `${num(P.piezas, 0)} piezas`, { det: 'home:rastras' })}
-    ${kpi('Utilidad por rastra', signed(porRastra), 'Utilidad neta ÷ rastras vendidas', { det: 'home:porRastra' })}
+    ${kpi('Utilidad por rastra', `${signed(porRastra)}<span class="kpi-pc">${pct(margen)}</span>`, `${pct(margen)} de margen sobre ${cop(P.rastras ? P.ingreso / P.rastras : 0)} de venta por rastra`, { det: 'home:porRastra' })}
   </div>`;
   const pos = `<div class="kpis soft">
     ${kpi('Por cobrar hoy', cop(porCobrar), `Mayoristas ${cop(M.mayorSaldo, true)} · ${esc(M.cfg.socio)} ${cop(Math.max(0, M.bbSaldo) + M.bbPorEntregar, true)} · Finales ${cop(M.finalSaldo, true)}${M.mayorFavor > 0.5 ? ` · Saldo a favor de mayoristas ${cop(M.mayorFavor, true)}` : ''}`, { cls: 'sm', det: 'home:cobrar' })}
@@ -1834,7 +1835,7 @@ VIEW_FN.mayoristas = R => {
   const kp = `<div class="kpis">
     ${kpi('Ventas', cop(ing), `${Ef.length} ${Ef.length === 1 ? 'pedido' : 'pedidos'}`, { dot: 'var(--s1)', det: 'may:ventas' })}
     ${kpi('Utilidad', signed(ut), `Margen ${pct(ing ? ut / ing : NaN)}`, { det: 'may:utilidad' })}
-    ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra`, { det: 'may:rastras' })}
+    ${kpi('Rastras', num(ra), `${cop(ra ? ut / ra : 0)} de utilidad por rastra · ${pct(ing ? ut / ing : NaN)} de margen`, { det: 'may:rastras' })}
     ${kpi('Cartera hoy', cop(saldoTot), `${vencTot > 0.5 ? `<span class="neg">${cop(vencTot)} vencido</span>` : 'Nada vencido'}${(x => x > 0.5 ? ` · ${cop(x)} de pedidos por entregar` : '')(sum(carSel, c => c.porEntregar))}${antTot > 0.5 ? ` · ${cop(antTot)} de saldo a favor de clientes` : ''}`, { det: 'may:cartera' })}
   </div>`;
   const ped = table([
@@ -1918,7 +1919,7 @@ function detPorCanal(E, o = {}) {
     ...(o.rastra ? [
       { h: 'Venta/rastra', r: 1, f: r => porRastraTxt(r.v, r.ras) },
       { h: 'Costo/rastra', r: 1, f: r => porRastraTxt(r.c, r.ras) },
-      { h: 'Utilidad/rastra', r: 1, f: r => r.ras ? signed(r.u / r.ras) : '—' },
+      { h: 'Utilidad/rastra', r: 1, f: r => r.ras ? `${signed(r.u / r.ras)}<span class="sub">margen ${pct(r.v ? r.u / r.v : NaN)}</span>` : '—' },
     ] : [
       { h: 'Valor', r: 1, f: r => `${cop(r.v)}<span class="sub">${pct(tot ? r.v / tot : NaN)} del total</span>` },
       { h: 'Utilidad', r: 1, f: r => `${signed(r.u)}<span class="sub">margen ${pct(r.v ? r.u / r.v : NaN)}</span>` },
@@ -1948,7 +1949,7 @@ function detPorMedida(E, top = 10) {
     { h: 'Piezas', r: 1, f: r => num(r.pzs, 0) },
     { h: 'Rastras', r: 1, f: r => num(r.ras) },
     { h: 'Valor', r: 1, f: r => cop(r.v) },
-    { h: 'Utilidad', r: 1, f: r => `${signed(r.u)}<span class="sub">${r.ras ? cop(r.u / r.ras) + '/rastra' : ''}</span>` },
+    { h: 'Utilidad', r: 1, f: r => `${signed(r.u)}<span class="sub">${r.ras ? cop(r.u / r.ras) + '/rastra · ' : ''}${pct(r.v ? r.u / r.v : NaN)}</span>` },
   ], rows, { empty: '<p class="muted">Sin ventas en este rango.</p>' });
 }
 function detGastos(R, M = model()) {
@@ -2076,13 +2077,13 @@ DET['home:rastras'] = R => {
 };
 DET['home:porRastra'] = R => {
   const M = model(), P = periodo(M, R), r = P.rastras, costo = sum(P.E, e => e.costo);
-  return detP(`Es la utilidad neta dividida por las rastras vendidas ${rangoTxt(R)}: cuánto te queda limpio por cada rastra.`)
+  return detP(`Es la utilidad neta dividida por las rastras vendidas ${rangoTxt(R)}: cuánto te queda limpio por cada rastra. El porcentaje es el margen: de cada $100 que vendes, cuánto te queda.`)
     + detCols(detLedger([
       ['Precio promedio por rastra', porRastraTxt(P.ingreso, r), { sub: `${cop(P.ingreso)} ÷ ${num(r)} rastras` }],
       ['− Costo promedio por rastra', porRastraTxt(costo, r), { sub: 'Pinera + mano de obra' }],
-      ['= Utilidad bruta por rastra', r ? signed(P.utilB / r) : '—', { total: true }],
-      ['− Gastos por rastra', porRastraTxt(P.gastos, r), { sub: `${cop(P.gastos)} de gastos, pauta y extras` }],
-      ['= Utilidad neta por rastra', r ? signed(P.utilN / r) : '—', { total: true }],
+      ['= Utilidad bruta por rastra', r ? signed(P.utilB / r) : '—', { total: true, sub: `margen ${pct(P.ingreso ? P.utilB / P.ingreso : NaN)}` }],
+      ['− Gastos por rastra', porRastraTxt(P.gastos, r), { sub: `${cop(P.gastos)} de gastos, pauta y extras · ${pct(P.ingreso ? P.gastos / P.ingreso : NaN)} de la venta` }],
+      ['= Utilidad neta por rastra', r ? signed(P.utilN / r) : '—', { total: true, sub: `margen ${pct(P.ingreso ? P.utilN / P.ingreso : NaN)}` }],
     ]), detH('Por canal (antes de gastos)') + detPorCanal(P.E, { rastra: true }))
     + detH('Por medida') + detPorMedida(P.E, 12);
 };
@@ -2274,7 +2275,7 @@ function fichaCliente(cid, M = model()) {
     <div class="inv-res ficha-k">
       <div><span>Ha comprado</span><b>${cop(v, true)}</b><small>${E.length} ${E.length === 1 ? 'pedido' : 'pedidos'}${PE.length ? ` + ${PE.length} por entregar` : ''}</small></div>
       <div><span>Te ha dejado</span><b class="${u < 0 ? 'neg' : ''}">${cop(u, true)}</b><small>margen ${pct(v ? u / v : NaN)}</small></div>
-      <div><span>Rastras</span><b>${num(ras)}</b><small>${ras ? `${cop(u / ras)} de utilidad por rastra` : '—'}</small></div>
+      <div><span>Rastras</span><b>${num(ras)}</b><small>${ras ? `${cop(u / ras)} de utilidad por rastra · ${pct(v ? u / v : NaN)}` : '—'}</small></div>
       <div><span>Pedido promedio</span><b>${cop(E.length ? v / E.length : 0, true)}</b><small>${num(E.length ? ras / E.length : 0)} rastras por pedido</small></div>
       <div><span>Primera compra</span><b>${fechas[0] ? fmtDay(fechas[0]) : '—'}</b><small>${fechas[0] ? fechas[0].slice(0, 4) : ''}</small></div>
       <div><span>Última compra</span><b>${fechas.length ? fmtDay(fechas[fechas.length - 1]) : '—'}</b><small>${cada ? `compra cada ${cada} días en promedio` : fechas.length ? `hace ${diffDays(fechas[fechas.length - 1], M.hoy)} días` : ''}</small></div>
